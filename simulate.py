@@ -18,14 +18,15 @@ gravity = -9.8
 
 # Objects connected by Springs
 startingObjectPositions = []
-# n_objects = 4
 
-# for object_idx in range(n_objects):
-#     startingObjectPositions.append([np.random.random(), np.random.random()*0.9])
 
 # Create the springs to connect two 'links'
-startingObjectPositions.append([0.1, ground_height+0.1])
-startingObjectPositions.append([0.1, ground_height+0.2])
+x_offset = 0.1
+for _ in range(2):
+    startingObjectPositions.append([x_offset, ground_height+0.1])
+    startingObjectPositions.append([x_offset, ground_height+0.2])
+    x_offset += 0.1
+    
 n_objects = len(startingObjectPositions)
 
 # -------------------------------------------------------------
@@ -44,20 +45,26 @@ springs = []
 
 # Append to springs.
 # Get objects
-object_a = startingObjectPositions[0]
-object_b = startingObjectPositions[1]
+for i in range(n_objects):
+    for j in range(i+1, n_objects):
+        object_a = startingObjectPositions[i]
+        object_b = startingObjectPositions[j]
 
-# Get x and y coordinates of objects to calculate distance
-x_distanceAB = object_a[0] - object_b[0]
-y_distanceAB = object_a[1] - object_b[1]
+        # Get x and y coordinates of objects to calculate distance
+        x_distanceAB = object_a[0] - object_b[0]
+        y_distanceAB = object_a[1] - object_b[1]
 
-# Pythagorean Distance.
-# Springs need a "at rest"-length that is the length that "likes" to stay at.
-distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
-resting_length = distance_A_to_B
+        # Pythagorean Distance.
+        # Springs need a "at rest"-length that is the length that "likes" to stay at.
+        distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
+        resting_length = distance_A_to_B
 
-# Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
-springs.append([0, 1, resting_length])
+        # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
+        springs.append([i, j, resting_length])
+    
+# Remove for v2
+# springs.pop(3)
+# springs.pop(2)
 n_springs = len(springs)
 
 # Store as Taichi fields
