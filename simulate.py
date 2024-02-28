@@ -16,10 +16,13 @@ gravity = -9.8
 
 # Objects connected by Springs
 startingObjectPositions = []
-n_objects = 4
+# n_objects = 4
 
-for object_idx in range(n_objects):
-    startingObjectPositions.append([np.random.random(), np.random.random()*0.9])
+# for object_idx in range(n_objects):
+#     startingObjectPositions.append([np.random.random(), np.random.random()*0.9])
+
+startingObjectPositions.append([0.1, ground_height])
+n_objects = len(startingObjectPositions)
 
 # -------------------------------------------------------------
 
@@ -126,27 +129,31 @@ def Create_video():
 
 
 # -------------------------------------------------------------
-Initialize()
 
-# Automated Differentiation.
-with tai.ad.Tape(loss):
-    
+def run_simulation():
+    Initialize()
+
+    # Automated Differentiation.
+    with tai.ad.Tape(loss):
+        
+        Simulate()
+        
+        # In our case dLoss / dPosition
+        Compute_loss()
+        
+    os.system("rm images/*.png")
+    Draw(0)
+
+
+    # Based on our loss. We have dLoss/dPosition, which is positions.grad[0,0][1]
+    # Update in the opposite direction of the gradient to minimize the loss
+    startingObjectPositions[0] += 0.1 * positions.grad[0,0]
+
+    Initialize()
     Simulate()
+    Draw(max_steps)
+    Create_video()
     
-    # In our case dLoss / dPosition
-    Compute_loss()
-    
-os.system("rm images/*.png")
-Draw(0)
-
-
-# Based on our loss. We have dLoss/dPosition, which is positions.grad[0,0][1]
-# Update in the opposite direction of the gradient to minimize the loss
-startingObjectPositions[0] += 0.1 * positions.grad[0,0]
-
-Initialize()
-Simulate()
-Draw(max_steps)
-Create_video()
+run_simulation()
 
 
