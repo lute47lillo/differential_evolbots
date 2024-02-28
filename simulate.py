@@ -12,6 +12,7 @@ import math
 
 max_steps = 100
 ground_height = 0.1
+stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.8
 
@@ -23,8 +24,8 @@ startingObjectPositions = []
 #     startingObjectPositions.append([np.random.random(), np.random.random()*0.9])
 
 # Create the springs to connect two 'links'
-startingObjectPositions.append([0.1, ground_height])
 startingObjectPositions.append([0.1, ground_height+0.1])
+startingObjectPositions.append([0.1, ground_height+0.2])
 n_objects = len(startingObjectPositions)
 
 # -------------------------------------------------------------
@@ -56,7 +57,7 @@ distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
 resting_length = distance_A_to_B
 
 # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
-springs.append([0, 1, ])
+springs.append([0, 1, resting_length])
 n_springs = len(springs)
 
 # Store as Taichi fields
@@ -80,6 +81,14 @@ tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
 
 # Taichi Structure for springs. Turn Spring anchor A & B from integer into field
 tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length) 
+
+# Forces of the springs
+spring_restoring_forces = vec()
+tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_forces)
+
+# Forces acting on the objects
+spring_forces_on_objects = vec()
+tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
 
 loss = tai.field(dtype=tai.f32, shape=(), needs_grad = True) # 0-D tensor
 
@@ -173,14 +182,21 @@ def step_one(time_step: tai.i32):
         # Apply force proportionally to the difference between the at rest lengths. Normalized result by current distance
         # Turn the restoring force to a vector parallet to the vector connecting the two objects (by mult by the distance_a_b)
         # Big distances (denominator says) should NOT have big forces -> Swinging pendulum effect without stability
-        spring_restoring_force = dt * spring_difference / (curr_rest_length * distance_a_b)
+        # We would also need to add strength to the spring -> stiffness
+        spring_restoring_forces[time_step, spring_idx] = (dt * spring_difference  * stiffness / curr_rest_length) * distance_a_b
+        
+        # Apply the force. - symbol means pulling force
+        spring_forces_on_objects[time_step, object_a_index] += - spring_restoring_forces[time_step, spring_idx]
+        spring_forces_on_objects[time_step, object_b_index] +=   spring_restoring_forces[time_step, spring_idx]
         
     
     for object_idx in range(n_objects):
         
         # Get old position and velocity
         old_pos = positions[time_step-1, object_idx]
-        old_velocity = velocities[time_step-1, object_idx] + dt * gravity  * tai.Vector([0,1]) # Change velocity as fn of gravity by dt
+        old_velocity = (velocities[time_step-1, object_idx] +
+                        dt * gravity  * tai.Vector([0,1]) + 
+                        spring_forces_on_objects[time_step, object_idx]) # Change velocity as fn of gravity by dt and the spring forces
         
         # Detect collisions
         if old_pos[1] <= ground_height:
