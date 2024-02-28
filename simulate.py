@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
+import math
 
 # -------------------------------------------------------------
 # move the object to max use the taichi's differentiable routine.
@@ -40,16 +41,30 @@ vec =  lambda: tai.Vector.field(2, dtype=real)
 
 springs = []
 
-# Append to springs
-# Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB]
-springs.append([0, 1])
+# Append to springs.
+# Get objects
+object_a = startingObjectPositions[0]
+object_b = startingObjectPositions[1]
+
+# Get x and y coordinates of objects to calculate distance
+x_distanceAB = object_a[0] - object_b[0]
+y_distanceAB = object_a[1] - object_b[1]
+
+# Pythagorean Distance.
+# Springs need a "at rest"-length that is the length that "likes" to stay at.
+distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
+resting_length = distance_A_to_B
+
+# Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
+springs.append([0, 1, ])
 n_springs = len(springs)
 
 # Store as Taichi fields
 spring_anchor_a = tai.field(tai.i32)
 spring_anchor_b = tai.field(tai.i32)
+spring_at_rest_length = tai.field(tai.f32)
 
-
+# -------------------------------------------------------------
 
 # Store positions of every object at every time step.
 # Where each position is a vector of length 2. x and y.
@@ -63,8 +78,8 @@ tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions.grad)
 velocities = vec()
 tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
 
-# Taichi Structure for springs
-tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b) # Turn Spring anchor A & B from integer into field
+# Taichi Structure for springs. Turn Spring anchor A & B from integer into field
+tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length) 
 
 loss = tai.field(dtype=tai.f32, shape=(), needs_grad = True) # 0-D tensor
 
@@ -99,8 +114,8 @@ def Draw(frame_offset):
             
         # Draw the springs
         for spring_idx in range(n_springs):
-            object_a_index = spring_anchor_a[object_idx]
-            object_b_index = spring_anchor_b[object_idx]
+            object_a_index = spring_anchor_a[spring_idx]
+            object_b_index = spring_anchor_b[spring_idx]
             
             # Get the positions of spring A at every time step
             position_a = positions[time_step, object_a_index]
@@ -123,8 +138,9 @@ def Initialize():
         
     for spring_idx in range(n_springs):
         s = springs[spring_idx] # Get spring
-        spring_anchor_a[object_idx] = s[0] # the a object of that spring
-        spring_anchor_b[object_idx] = s[1]
+        spring_anchor_a[spring_idx]         = s[0] # the a object of that spring
+        spring_anchor_b[spring_idx]         = s[1]
+        spring_at_rest_length[spring_idx]   = s[2]
 
 # -------------------------------------------------------------
 def Simulate():
@@ -137,6 +153,28 @@ def Simulate():
 # -------------------------------------------------------------
 @tai.kernel
 def step_one(time_step: tai.i32):
+    
+    # Simulate the physics of each springs at initial step
+    for spring_idx in range(n_springs):
+        object_a_index = spring_anchor_a[spring_idx]
+        object_b_index = spring_anchor_b[spring_idx]
+        
+        # Get most recent position.
+        position_a = positions[time_step-1, object_a_index]
+        position_b = positions[time_step-1, object_b_index]
+        
+        # Compute distance between objects -> Length of spring at rest
+        distance_a_b = position_a - position_b
+        curr_rest_length = distance_a_b.norm()
+        
+        # Difference between current and supposed initial at that index
+        spring_difference = curr_rest_length - spring_at_rest_length[spring_idx]
+        
+        # Apply force proportionally to the difference between the at rest lengths. Normalized result by current distance
+        # Turn the restoring force to a vector parallet to the vector connecting the two objects (by mult by the distance_a_b)
+        # Big distances (denominator says) should NOT have big forces -> Swinging pendulum effect without stability
+        spring_restoring_force = dt * spring_difference / (curr_rest_length * distance_a_b)
+        
     
     for object_idx in range(n_objects):
         
@@ -176,7 +214,7 @@ def run_simulation():
         # In our case dLoss / dPosition
         # Compute_loss()
         
-    # os.system("rm images/*.png")
+    os.system("rm images/*.png")
     Draw(0)
 
 
