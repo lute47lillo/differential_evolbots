@@ -10,7 +10,7 @@ import math
 # move the object to max use the taichi's differentiable routine.
 # TODO: Taichi's Fields documentation !
 
-max_steps = 100
+max_steps = 200
 ground_height = 0.1
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
@@ -47,8 +47,9 @@ springs = []
 
 # Append to springs.
 # Get objects
-is_motor = [1, 0, 0, 0, 0, 0]
+is_motor = [1, 1, 1, 0, 0, 0]
 for i in range(n_objects):
+    
     for j in range(i+1, n_objects):
         object_a = startingObjectPositions[i]
         object_b = startingObjectPositions[j]
@@ -63,17 +64,23 @@ for i in range(n_objects):
         resting_length = distance_A_to_B
 
         # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
-        springs.append([i, j, resting_length, is_motor[j-1]])
+        springs.append([i, j, resting_length, 0])
     
 # Remove for v2
 # springs.pop(3)
 # springs.pop(2)
 n_springs = len(springs)
 
+# Add motors to springs
+for i in range(n_springs):
+    springs[i][3] = is_motor[i]
+    
+
 # Store as Taichi fields
 spring_anchor_a = tai.field(tai.i32)
 spring_anchor_b = tai.field(tai.i32)
 spring_at_rest_length = tai.field(tai.f32)
+spring_actuation = tai.field(tai.i32) # Wheter or not the spring contains a piston motor that deals with the length. Binary value
 
 # -------------------------------------------------------------
 
@@ -90,7 +97,7 @@ velocities = vec()
 tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
 
 # Taichi Structure for springs. Turn Spring anchor A & B from integer into field
-tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length) 
+tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length, spring_actuation) 
 
 # Forces of the springs
 spring_restoring_forces = vec()
@@ -166,6 +173,7 @@ def Initialize():
         spring_anchor_a[spring_idx]         = s[0] # the a object of that spring
         spring_anchor_b[spring_idx]         = s[1]
         spring_at_rest_length[spring_idx]   = s[2]
+        spring_actuation[spring_idx]        = s[3]
 
 # -------------------------------------------------------------
 def Simulate():
@@ -192,8 +200,15 @@ def step_one(time_step: tai.i32):
         distance_a_b = position_a - position_b
         curr_rest_length = distance_a_b.norm()
         
+        spring_resting_length = spring_at_rest_length[spring_idx]
+        
+        # Applying the sinuisoidal function to have the piston of the motor (the cause of the movement be in that range)
+        # TODO: Adapt the force_of_piston constant to be an actual variable
+        spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] *  tai.sin(0.9*time_step)
+        
+        
         # Difference between current and supposed initial at that index
-        spring_difference = curr_rest_length - spring_at_rest_length[spring_idx]
+        spring_difference = curr_rest_length - spring_resting_length
         
         # Apply force proportionally to the difference between the at rest lengths. Normalized result by current distance
         # Turn the restoring force to a vector parallet to the vector connecting the two objects (by mult by the distance_a_b)
@@ -214,8 +229,8 @@ def step_one(time_step: tai.i32):
                         dt * gravity  * tai.Vector([0,1]) + 
                         spring_forces_on_objects[time_step, object_idx]) # Change velocity as fn of gravity by dt and the spring forces
         
-        # Detect collisions
-        if old_pos[1] <= ground_height:
+        # Detect collisions. And check that velocity is still moving as cause of motor
+        if old_pos[1] <= ground_height and old_velocity[1] < 0:
             
             old_velocity = tai.Vector([0,0])
         
