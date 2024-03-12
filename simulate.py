@@ -16,6 +16,8 @@ stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.8
 
+damping = 0.8 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+
 # Objects connected by Springs
 startingObjectPositions = []
 
@@ -45,6 +47,7 @@ springs = []
 
 # Append to springs.
 # Get objects
+is_motor = [1, 0, 0, 0, 0, 0]
 for i in range(n_objects):
     for j in range(i+1, n_objects):
         object_a = startingObjectPositions[i]
@@ -60,7 +63,7 @@ for i in range(n_objects):
         resting_length = distance_A_to_B
 
         # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
-        springs.append([i, j, resting_length])
+        springs.append([i, j, resting_length, is_motor[j-1]])
     
 # Remove for v2
 # springs.pop(3)
@@ -137,7 +140,13 @@ def Draw(frame_offset):
             position_a = positions[time_step, object_a_index]
             position_b = positions[time_step, object_b_index]
             
-            tai_gui.line(begin=position_a, end=position_b, color=0x0, radius=1)
+            has_motor = springs[spring_idx][3]
+            
+            if has_motor:
+                tai_gui.line(begin=position_a, end=position_b, color=0x0, radius=3) # Thicker line
+            else:
+                tai_gui.line(begin=position_a, end=position_b, color=0x0, radius=1)
+
                 
         tai_gui.show(f"images/test_{frame_offset+time_step}.png")
 
@@ -201,7 +210,7 @@ def step_one(time_step: tai.i32):
         
         # Get old position and velocity
         old_pos = positions[time_step-1, object_idx]
-        old_velocity = (velocities[time_step-1, object_idx] +
+        old_velocity = (damping * velocities[time_step-1, object_idx] +
                         dt * gravity  * tai.Vector([0,1]) + 
                         spring_forces_on_objects[time_step, object_idx]) # Change velocity as fn of gravity by dt and the spring forces
         
