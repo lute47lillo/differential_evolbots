@@ -184,9 +184,9 @@ def Simulate():
         step_one(time_step)
 
 # -------------------------------------------------------------
+
 @tai.kernel
-def step_one(time_step: tai.i32):
-    
+def simulate_springs(time_step: tai.i32):
     # Simulate the physics of each springs at initial step
     for spring_idx in range(n_springs):
         object_a_index = spring_anchor_a[spring_idx]
@@ -206,7 +206,6 @@ def step_one(time_step: tai.i32):
         # TODO: Adapt the force_of_piston constant to be an actual variable
         spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] *  tai.sin(0.9*time_step)
         
-        
         # Difference between current and supposed initial at that index
         spring_difference = curr_rest_length - spring_resting_length
         
@@ -220,6 +219,10 @@ def step_one(time_step: tai.i32):
         spring_forces_on_objects[time_step, object_a_index] += - spring_restoring_forces[time_step, spring_idx]
         spring_forces_on_objects[time_step, object_b_index] +=   spring_restoring_forces[time_step, spring_idx]
         
+# -------------------------------------------------------------
+
+@tai.kernel
+def simulate_objects(time_step: tai.i32):
     
     for object_idx in range(n_objects):
         
@@ -240,6 +243,13 @@ def step_one(time_step: tai.i32):
         
         new_velocity = old_velocity
         velocities[time_step, object_idx] = new_velocity
+        
+# -------------------------------------------------------------
+
+def step_one(time_step: tai.i32):
+    
+    simulate_springs(time_step)
+    simulate_objects(time_step)
             
 # -------------------------------------------------------------
 # Create Video
