@@ -139,6 +139,18 @@ def Compute_loss():
 center = vec()
 tai.root.dense(tai.i, max_steps).place(center)
 
+# Determine the goal of the robot.
+goal = vec()
+tai.root.place(goal)
+
+# Create field for N hidden neurons at each time_step
+hidden = tai.field(tai.f32)
+tai.root.dense(tai.ij, [max_steps, n_hidden_neurons]).place(hidden)
+
+# Create bias. One per each hidden neuron. Total N bias
+bias_hidden = tai.field(tai.f32)
+tai.root.dense(tai.i, n_hidden_neurons).place(bias_hidden)
+
 @tai.kernel
 def calculate_center_robot(time_step: tai.i32):
     
@@ -212,6 +224,11 @@ def Initialize():
         for j in range(n_sensors()):
             weightsSH[i,j] = np.random.randn() * 2 -1
             
+    for i in range(n_hidden_neurons):
+        bias_hidden[i] = np.random.randn() * 2 - 1
+            
+    goal[None] = [0.9, 0.2]
+            
 # -------------------------------------------------------------
 def Simulate():
     
@@ -247,7 +264,17 @@ def simulate_neural_network(time_step: tai.i32):
             
             activation += weightsSH[i, j* 4 + 2 + n_sin_waves] * positions[time_step, j][1]
             activation += weightsSH[i, j* 4 + 3 + n_sin_waves] * positions[time_step, j][1]
+        
+        # goal sensors -> how far the bot got?
+        activation += weightsSH[i, n_objects * 4 + n_sin_waves] * (goal[None][0] - center[0][time_step])
+        activation += weightsSH[i, n_objects * 4 + n_sin_waves + 1] * (goal[None][1] - center[1][time_step])
             
+        # Apply non-linearity
+        activation += bias_hidden[i]
+        activation = tai.tanh(activation)
+        
+        # Store in a hidden neuron at every time_step
+        hidden[time_step, i] = activation
 # -------------------------------------------------------------
 
 @tai.kernel
@@ -313,8 +340,12 @@ def simulate_objects(time_step: tai.i32):
 
 def step_one(time_step: tai.i32):
     
+    calculate_center_robot(time_step)
+    simulate_neural_network(time_step)
     simulate_springs(time_step)
     simulate_objects(time_step)
+    
+    print(hidden)
             
 # -------------------------------------------------------------
 # Create Video
@@ -347,7 +378,7 @@ def run_simulation():
     # Initialize()
     # Simulate()
     # Draw(max_steps)
-    Create_video()
+    # Create_video()
     
 run_simulation()
 
