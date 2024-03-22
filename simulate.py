@@ -84,6 +84,8 @@ spring_actuation = tai.field(tai.i32) # Wheter or not the spring contains a pist
 
 # -------------------------------------------------------------
 # NEURAL NETWORK 
+
+# Sensor to Hidden neurons and weights
 weightsSH = tai.field(tai.f32)
 
 # Arbitrary choices
@@ -97,6 +99,13 @@ def n_sensors():
 # Put weights from Sensors to hidden neurons
 tai.root.dense(tai.ij, (n_hidden_neurons, n_sensors())).place(weightsSH)
 
+# Hidden to Motor neurons and weights
+weightsHM = tai.field(tai.f32)
+tai.root.dense(tai.ij, (n_springs, n_hidden_neurons)).place(weightsHM)
+
+# Capture motor value to be sent to every spring at every time_step
+actuation = tai.field(tai.f32)
+tai.root.dense(tai.ij, (max_steps, n_springs)).place(actuation)
 # -------------------------------------------------------------
 # Store positions of every object at every time step.
 # Where each position is a vector of length 2. x and y.
@@ -220,12 +229,19 @@ def Initialize():
         spring_at_rest_length[spring_idx]   = s[2]
         spring_actuation[spring_idx]        = s[3]
         
+    # Initialize sensor to hidden neurons
     for i in range(n_hidden_neurons):
         for j in range(n_sensors()):
-            weightsSH[i,j] = np.random.randn() * 2 -1
-            
+            weightsSH[i,j] = np.random.randn() * 0.2 - 0.1
+    
+    # Init bias for hidden neurons
     for i in range(n_hidden_neurons):
         bias_hidden[i] = np.random.randn() * 2 - 1
+        
+    # Init 
+    for i in range(n_springs):
+        for j in range(n_hidden_neurons):
+            weightsHM[i,j] = np.random.randn() * 0.2 - 0.1
             
     goal[None] = [0.9, 0.2]
             
@@ -241,33 +257,33 @@ def Simulate():
 
 # transform senation into action
 @tai.kernel
-def simulate_neural_network(time_step: tai.i32):
+def simulate_neural_network_SH(time_step: tai.i32):
     # Propagate values
     for i in range(n_hidden_neurons):
         activation = 0.0
         
         # for each of the CPPNS
-        for j in range(n_sin_waves): 
+        for j in tai.static(range(n_sin_waves)): 
             # increment act of i-th neuron by the sinuoisoid of time_step. j is a phase offset
-            activation += weightsSH[i,j] * tai.sin(time_step*dt + \
+            activation += weightsSH[i,j] * tai.sin(20 * time_step*dt + \
                                                     2* math.pi / n_sin_waves * j) 
             
         # Simulate the sensors inside the objects
         # First 2 sensors -> 'proprioceptive sensors'. Indicate position of that object wrt robots center of mass.
-        for j in range(n_objects):
+        for j in tai.static(range(n_objects)):
             offset = positions[time_step, j] - center[time_step]
             
             # Add to i-th neuron, the horizontal dist between j-th object and bot's center
-            activation += weightsSH[i, j* 4 + n_sin_waves] * offset[0]
+            activation += 0.5 * weightsSH[i, j* 4 + n_sin_waves] * offset[0]
             # Add to i-th neuron, the vertical dist between j-th object and bot's center
-            activation += weightsSH[i, j* 4 + 1 + n_sin_waves] * offset[1]
+            activation += 0.5 * weightsSH[i, j* 4 + 1 + n_sin_waves] * offset[1]
             
-            activation += weightsSH[i, j* 4 + 2 + n_sin_waves] * positions[time_step, j][1]
-            activation += weightsSH[i, j* 4 + 3 + n_sin_waves] * positions[time_step, j][1]
+            activation += 0.5 * weightsSH[i, j* 4 + 2 + n_sin_waves] * positions[time_step, j][1]
+            activation += 0.5 * weightsSH[i, j* 4 + 3 + n_sin_waves] * positions[time_step, j][1]
         
         # goal sensors -> how far the bot got?
-        activation += weightsSH[i, n_objects * 4 + n_sin_waves] * (goal[None][0] - center[0][time_step])
-        activation += weightsSH[i, n_objects * 4 + n_sin_waves + 1] * (goal[None][1] - center[1][time_step])
+        activation += 0.5 * weightsSH[i, n_objects * 4 + n_sin_waves] * (goal[None][0] - center[0][time_step])
+        activation += 0.5 * weightsSH[i, n_objects * 4 + n_sin_waves + 1] * (goal[None][1] - center[1][time_step])
             
         # Apply non-linearity
         activation += bias_hidden[i]
@@ -275,6 +291,25 @@ def simulate_neural_network(time_step: tai.i32):
         
         # Store in a hidden neuron at every time_step
         hidden[time_step, i] = activation
+# -------------------------------------------------------------
+
+@tai.kernel
+def simulate_neural_network_HM(time_step: tai.i32):
+    
+    # For every spring..
+    for i in range(n_springs):
+        
+        activation = 0.0 # Init for each motor neuron
+        
+        # Visit each hidden neuron. And sum up influence of all hidden neurons for each motor.
+        for j in tai.static(range(n_hidden_neurons)):
+            
+            activation += weightsHM[i, j] * hidden[time_step, j] # pre-synaptic hidden neuron value
+            
+        activation = tai.tanh(activation)
+        actuation[time_step, i] = activation
+            
+
 # -------------------------------------------------------------
 
 @tai.kernel
@@ -296,7 +331,11 @@ def simulate_springs(time_step: tai.i32):
         
         # Applying the sinuisoidal function to have the piston of the motor (the cause of the movement be in that range)
         # TODO: Adapt the force_of_piston constant to be an actual variable
-        spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] *  tai.sin(0.9*time_step)
+        # spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * tai.sin(0.9*time_step)
+        
+        # Newer version takes the motorized action form the NN
+        spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * actuation[time_step, spring_idx]
+        
         
         # Difference between current and supposed initial at that index
         spring_difference = curr_rest_length - spring_resting_length
@@ -341,11 +380,11 @@ def simulate_objects(time_step: tai.i32):
 def step_one(time_step: tai.i32):
     
     calculate_center_robot(time_step)
-    simulate_neural_network(time_step)
+    simulate_neural_network_SH(time_step)
+    simulate_neural_network_HM(time_step)
     simulate_springs(time_step)
     simulate_objects(time_step)
-    
-    print(hidden)
+
             
 # -------------------------------------------------------------
 # Create Video
@@ -370,7 +409,6 @@ def run_simulation():
     os.system("rm images/*.png")
     Draw(0)
 
-
     # Based on our loss. We have dLoss/dPosition, which is positions.grad[0,0][1]
     # Update in the opposite direction of the gradient to minimize the loss
     # startingObjectPositions[0] += 0.1 * positions.grad[0,0]
@@ -378,7 +416,7 @@ def run_simulation():
     # Initialize()
     # Simulate()
     # Draw(max_steps)
-    # Create_video()
+    Create_video()
     
 run_simulation()
 
