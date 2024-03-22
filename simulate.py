@@ -83,7 +83,21 @@ spring_at_rest_length = tai.field(tai.f32)
 spring_actuation = tai.field(tai.i32) # Wheter or not the spring contains a piston motor that deals with the length. Binary value
 
 # -------------------------------------------------------------
+# NEURAL NETWORK 
+weightsSH = tai.field(tai.f32)
 
+# Arbitrary choices
+n_hidden_neurons = 32
+n_sin_waves = 10
+
+def n_sensors():
+    # Simulate Central Pattern Generators (CPPNS). 4 sensors per objects. 2 global sensors (horizontal and vertical dist)
+    return n_sin_waves + 4 * n_objects + 2
+
+# Put weights from Sensors to hidden neurons
+tai.root.dense(tai.ij, (n_hidden_neurons, n_sensors())).place(weightsSH)
+
+# -------------------------------------------------------------
 # Store positions of every object at every time step.
 # Where each position is a vector of length 2. x and y.
 positions = vec()
@@ -107,9 +121,10 @@ tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_
 spring_forces_on_objects = vec()
 tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
 
-loss = tai.field(dtype=tai.f32, shape=(), needs_grad = True) # 0-D tensor
 
 # -------------------------------------------------------------
+loss = tai.field(dtype=tai.f32, shape=(), needs_grad = True) # 0-D tensor
+
 # Execute by Taichi and not python by using decorater
 @tai.kernel
 def Compute_loss():
@@ -119,6 +134,24 @@ def Compute_loss():
     loss[None] = positions[max_steps-1, 0][1]
     
 # -------------------------------------------------------------
+
+# Determines center of the bot by the time_step
+center = vec()
+tai.root.dense(tai.i, max_steps).place(center)
+
+@tai.kernel
+def calculate_center_robot(time_step: tai.i32):
+    
+    for _ in range(1): #Taichi sugar code
+        c = tai.Vector([0.0, 0.0])
+        
+        for i in range(n_objects):
+            c += positions[time_step, i] # Position of i-th object at time_step
+            
+        center[time_step] = c / n_objects
+
+# -------------------------------------------------------------
+
 def Draw(frame_offset):
     
     for time_step in range(0, max_steps):
@@ -174,7 +207,11 @@ def Initialize():
         spring_anchor_b[spring_idx]         = s[1]
         spring_at_rest_length[spring_idx]   = s[2]
         spring_actuation[spring_idx]        = s[3]
-
+        
+    for i in range(n_hidden_neurons):
+        for j in range(n_sensors()):
+            weightsSH[i,j] = np.random.randn() * 2 -1
+            
 # -------------------------------------------------------------
 def Simulate():
     
@@ -183,6 +220,34 @@ def Simulate():
         # Update position of object.
         step_one(time_step)
 
+# -------------------------------------------------------------
+
+# transform senation into action
+@tai.kernel
+def simulate_neural_network(time_step: tai.i32):
+    # Propagate values
+    for i in range(n_hidden_neurons):
+        activation = 0.0
+        
+        # for each of the CPPNS
+        for j in range(n_sin_waves): 
+            # increment act of i-th neuron by the sinuoisoid of time_step. j is a phase offset
+            activation += weightsSH[i,j] * tai.sin(time_step*dt + \
+                                                    2* math.pi / n_sin_waves * j) 
+            
+        # Simulate the sensors inside the objects
+        # First 2 sensors -> 'proprioceptive sensors'. Indicate position of that object wrt robots center of mass.
+        for j in range(n_objects):
+            offset = positions[time_step, j] - center[time_step]
+            
+            # Add to i-th neuron, the horizontal dist between j-th object and bot's center
+            activation += weightsSH[i, j* 4 + n_sin_waves] * offset[0]
+            # Add to i-th neuron, the vertical dist between j-th object and bot's center
+            activation += weightsSH[i, j* 4 + 1 + n_sin_waves] * offset[1]
+            
+            activation += weightsSH[i, j* 4 + 2 + n_sin_waves] * positions[time_step, j][1]
+            activation += weightsSH[i, j* 4 + 3 + n_sin_waves] * positions[time_step, j][1]
+            
 # -------------------------------------------------------------
 
 @tai.kernel
