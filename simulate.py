@@ -5,32 +5,150 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import numpy as np
 import math
+import random
 
 # -------------------------------------------------------------
 # move the object to max use the taichi's differentiable routine.
 # TODO: Taichi's Fields documentation !
 
 max_steps = 200
-ground_height = 0.1
+ground_height = 0.05
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.8
+learning_rate = 1
 
-damping = 0.8 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.4 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 
 # Objects connected by Springs
 startingObjectPositions = []
 
-
 # Create the springs to connect two 'links'
-x_offset = 0.1
-for _ in range(2):
-    startingObjectPositions.append([x_offset, ground_height+0.1])
-    startingObjectPositions.append([x_offset, ground_height+0.2])
-    x_offset += 0.1
+# x_offset = 0.1
+# for _ in range(2):
+#     startingObjectPositions.append([x_offset, ground_height+0.1])
+#     startingObjectPositions.append([x_offset, ground_height+0.2])
+#     x_offset += 0.1
     
-n_objects = len(startingObjectPositions)
+springs = []
+def create_spring(i, j, is_motor):
+    
+    object_a = startingObjectPositions[i]
+    object_b = startingObjectPositions[j]
 
+    # Get x and y coordinates of objects to calculate distance
+    x_distanceAB = object_a[0] - object_b[0]
+    y_distanceAB = object_a[1] - object_b[1]
+
+    # Pythagorean Distance.
+    # Springs need a "at rest"-length that is the length that "likes" to stay at.
+    distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
+    resting_length = distance_A_to_B
+    
+    springs.append([i, j, resting_length, is_motor])
+
+
+def create_hw5_robot():
+    x_offset = 0.1
+    
+    # Vertical I
+    startingObjectPositions.append([x_offset-0.05, ground_height+0.1]) # 0
+    startingObjectPositions.append([x_offset, ground_height+0.2]) # 1
+    startingObjectPositions.append([x_offset, ground_height+0.3]) # 2
+    startingObjectPositions.append([x_offset+0.2, ground_height+0.5]) # 3
+    
+    create_spring(0, 1, 1)
+    create_spring(1, 2, 1)
+    
+    # horizontal Top.1
+    startingObjectPositions.append([x_offset+0.1, ground_height+0.3]) # 4
+    startingObjectPositions.append([x_offset+0.2, ground_height+0.3]) # 5
+    startingObjectPositions.append([x_offset+0.4, ground_height+0.3]) # 6
+    
+    create_spring(1, 4, 0)
+    create_spring(2, 4, 0)
+    create_spring(4, 5, 1)
+    
+    
+    # horizontal Top.2
+    startingObjectPositions.append([x_offset+0.1, ground_height+0.4]) # 7
+    startingObjectPositions.append([x_offset+0.2, ground_height+0.4]) # 8
+    startingObjectPositions.append([x_offset+0.3, ground_height+0.4]) # 9
+    
+    create_spring(3, 7, 1)
+    create_spring(3, 8, 0)
+    create_spring(3, 9, 1)
+    create_spring(7, 8, 0)
+    create_spring(8, 9, 0)
+    create_spring(9, 6, 1)
+    
+    create_spring(2, 7, 1)
+    create_spring(4, 7, 0)
+    create_spring(4, 8, 0)
+    create_spring(5, 7, 0)
+    create_spring(5, 8, 0)
+    create_spring(5, 9, 0)
+   
+    # HorizontalBottom.1
+    startingObjectPositions.append([x_offset+0.3, ground_height+0.2]) # 10
+    startingObjectPositions.append([x_offset+0.4, ground_height+0.2]) # 11
+    
+    create_spring(10, 6, 0)
+    create_spring(10, 11, 0)
+    create_spring(11, 6, 1)
+
+    
+    
+    # Horizontal bottom toe
+    startingObjectPositions.append([x_offset+0.4, ground_height+0.1]) # 12
+    startingObjectPositions.append([x_offset+0.45, ground_height+0.1]) # 13
+    
+    # Extra back leg support
+    startingObjectPositions.append([x_offset+0.15, ground_height+0.1]) # 14
+
+    
+    # Extra front leg
+    startingObjectPositions.append([x_offset+0.25, ground_height+0.1]) # 15
+    startingObjectPositions.append([x_offset+0.3, ground_height+0.1]) # 16
+    create_spring(10, 15, 1)
+    create_spring(10, 16, 1)
+    create_spring(11, 12, 1)
+    create_spring(11, 13, 1)
+    create_spring(12, 13, 0)
+    create_spring(16, 12, 0)
+    create_spring(16, 15, 0)
+    
+    # Extra back leg
+    startingObjectPositions.append([x_offset+0.1, ground_height+0.2]) # 17
+    # create_spring(17, 0, 1)
+    create_spring(17, 1, 0)
+    create_spring(17, 2, 0)
+    create_spring(14, 17, 1)
+    create_spring(4, 17, 1)
+    
+    # Fixing middle
+    startingObjectPositions.append([x_offset+0.3, ground_height+0.3]) # 18
+    create_spring(18, 10, 1)
+    create_spring(18, 6, 0)
+    create_spring(18, 11, 0)
+    create_spring(18, 9, 0)
+    create_spring(18, 8, 0)
+    create_spring(18, 5, 1)
+    
+    # Extra back 2
+    startingObjectPositions.append([x_offset, ground_height+0.1]) # 19
+    startingObjectPositions.append([x_offset+0.1, ground_height+0.1]) # 20
+    
+    create_spring(19, 0, 0)
+    create_spring(19, 1, 1)
+    create_spring(14, 20, 0)
+    create_spring(17, 20, 1)
+    create_spring(19, 20, 0)
+    
+    
+    
+create_hw5_robot()
+n_objects = len(startingObjectPositions)
 # -------------------------------------------------------------
 
 
@@ -43,39 +161,35 @@ vec =  lambda: tai.Vector.field(2, dtype=real)
 
 # -------------------------------------------------------------
 
-springs = []
-
 # Append to springs.
 # Get objects
-is_motor = [1, 1, 1, 0, 0, 0]
-for i in range(n_objects):
     
-    for j in range(i+1, n_objects):
-        object_a = startingObjectPositions[i]
-        object_b = startingObjectPositions[j]
-
-        # Get x and y coordinates of objects to calculate distance
-        x_distanceAB = object_a[0] - object_b[0]
-        y_distanceAB = object_a[1] - object_b[1]
-
-        # Pythagorean Distance.
-        # Springs need a "at rest"-length that is the length that "likes" to stay at.
-        distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
-        resting_length = distance_A_to_B
-
-        # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
-        springs.append([i, j, resting_length, 0])
+# for i in range(n_objects):
     
-# Remove for v2
-# springs.pop(3)
-# springs.pop(2)
+#     for j in range(i+1, n_objects):
+#         object_a = startingObjectPositions[i]
+#         object_b = startingObjectPositions[j]
+
+#         # Get x and y coordinates of objects to calculate distance
+#         x_distanceAB = object_a[0] - object_b[0]
+#         y_distanceAB = object_a[1] - object_b[1]
+
+#         # Pythagorean Distance.
+#         # Springs need a "at rest"-length that is the length that "likes" to stay at.
+#         distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
+#         resting_length = distance_A_to_B
+
+#         # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
+#         springs.append([i, j, resting_length, 0])
+
+# is_motor = [1, 1, 1, 0, 0, 0, 0, 0, 1, 0]
 n_springs = len(springs)
+# is_motor = [random.randint(0, 1) for _ in range(n_springs)]
 
-# Add motors to springs
-for i in range(n_springs):
-    springs[i][3] = is_motor[i]
+# # Add motors to springs
+# for i in range(n_springs):
+#     springs[i][3] = is_motor[i]
     
-
 # Store as Taichi fields
 spring_anchor_a = tai.field(tai.i32)
 spring_anchor_b = tai.field(tai.i32)
@@ -130,20 +244,7 @@ tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_
 spring_forces_on_objects = vec()
 tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
 
-
 # -------------------------------------------------------------
-loss = tai.field(dtype=tai.f32, shape=(), needs_grad = True) # 0-D tensor
-
-# Execute by Taichi and not python by using decorater
-@tai.kernel
-def Compute_loss():
-    
-    # Focus on position of the objects to determine loss fn. Arbitrary choice
-    # Second component of zeroth object. Loss = Height of 0th objects at last time_step
-    loss[None] = positions[max_steps-1, 0][1]
-    
-# -------------------------------------------------------------
-
 # Determines center of the bot by the time_step
 center = vec()
 tai.root.dense(tai.i, max_steps).place(center)
@@ -159,6 +260,23 @@ tai.root.dense(tai.ij, [max_steps, n_hidden_neurons]).place(hidden)
 # Create bias. One per each hidden neuron. Total N bias
 bias_hidden = tai.field(tai.f32)
 tai.root.dense(tai.i, n_hidden_neurons).place(bias_hidden)
+
+# -------------------------------------------------------------
+loss = tai.field(dtype=tai.f32, shape=()) # 0-D tensor
+# Gradients
+tai.root.lazy_grad()
+
+# Execute by Taichi and not python by using decorater
+@tai.kernel
+def Compute_loss():
+    
+    # Focus on position of the objects to determine loss fn. Arbitrary choice
+    # Second component of zeroth object. Loss = Height of 0th objects at last time_step
+    loss[None] -= positions[max_steps-1, 0][1]
+    
+    # calculate the loss based on the distance travelled to the right
+    
+# -------------------------------------------------------------
 
 @tai.kernel
 def calculate_center_robot(time_step: tai.i32):
@@ -213,14 +331,19 @@ def Draw(frame_offset):
 
 # -------------------------------------------------------------
 def Initialize():
-    
+    """
+        Definition
+        -----------
+            Initialize the robot. Call at the beginning of each run.
+            
+    """
     # Initialize the position for each object
     for object_idx in range(n_objects):
         # Temp, just propagate positions.
         positions[0, object_idx] = startingObjectPositions[object_idx]
         
         # Set initial velocites
-        velocities[0, object_idx] = [0,-0.1]
+        velocities[0, object_idx] = [0, -0.1]
         
     for spring_idx in range(n_springs):
         s = springs[spring_idx] # Get spring
@@ -229,6 +352,43 @@ def Initialize():
         spring_at_rest_length[spring_idx]   = s[2]
         spring_actuation[spring_idx]        = s[3]
         
+    # Reset Positions (x,y) and velocities
+    for i in range(1, max_steps):
+        for j in range(n_objects):
+            positions[i,j][0] = 0.0
+            positions[i,j][1] = 0.0
+            velocities[i,j][0] = 0.0
+            velocities[i,j][1] = 0.0
+    
+    for i in range(1, max_steps):
+        for j in range(n_springs):
+            spring_restoring_forces[i,j][0] = 0.0   
+            spring_restoring_forces[i,j][1] = 0.0 
+            
+    # Restore forces apply on the object by the springs
+    for i in range(1, max_steps):
+        for j in range(n_objects):
+            spring_forces_on_objects[i,j][0] = 0.0   
+            spring_forces_on_objects[i,j][1] = 0.0 
+    
+    # Reset values
+    for i in range(1, max_steps):
+        for j in range(n_hidden_neurons):
+            hidden[i,j] = 0.0
+            
+    # Reset values of motor neurons
+    for i in range(1, max_steps):
+        for j in range(n_springs):
+            actuation[i,j] = 0.0
+            
+    goal[None] = [0.9, 0.2]
+        
+def Initialize_Neural_Network():
+    """
+         Definition
+        -----------
+            Initialize the paramters of the Neural Network.
+    """
     # Initialize sensor to hidden neurons
     for i in range(n_hidden_neurons):
         for j in range(n_sensors()):
@@ -238,12 +398,10 @@ def Initialize():
     for i in range(n_hidden_neurons):
         bias_hidden[i] = np.random.randn() * 2 - 1
         
-    # Init 
+    # Init weights
     for i in range(n_springs):
         for j in range(n_hidden_neurons):
             weightsHM[i,j] = np.random.randn() * 0.2 - 0.1
-            
-    goal[None] = [0.9, 0.2]
             
 # -------------------------------------------------------------
 def Simulate():
@@ -258,6 +416,7 @@ def Simulate():
 # transform senation into action
 @tai.kernel
 def simulate_neural_network_SH(time_step: tai.i32):
+    
     # Propagate values
     for i in range(n_hidden_neurons):
         activation = 0.0
@@ -265,7 +424,7 @@ def simulate_neural_network_SH(time_step: tai.i32):
         # for each of the CPPNS
         for j in tai.static(range(n_sin_waves)): 
             # increment act of i-th neuron by the sinuoisoid of time_step. j is a phase offset
-            activation += weightsSH[i,j] * tai.sin(20 * time_step*dt + \
+            activation += weightsSH[i,j] * tai.sin(30 * time_step*dt + \
                                                     2* math.pi / n_sin_waves * j) 
             
         # Simulate the sensors inside the objects
@@ -274,16 +433,16 @@ def simulate_neural_network_SH(time_step: tai.i32):
             offset = positions[time_step, j] - center[time_step]
             
             # Add to i-th neuron, the horizontal dist between j-th object and bot's center
-            activation += 0.5 * weightsSH[i, j* 4 + n_sin_waves] * offset[0]
+            activation += 0.25 * weightsSH[i, j* 4 + n_sin_waves] * offset[0]
             # Add to i-th neuron, the vertical dist between j-th object and bot's center
-            activation += 0.5 * weightsSH[i, j* 4 + 1 + n_sin_waves] * offset[1]
+            activation += 0.25 * weightsSH[i, j* 4 + 1 + n_sin_waves] * offset[1]
             
-            activation += 0.5 * weightsSH[i, j* 4 + 2 + n_sin_waves] * positions[time_step, j][1]
-            activation += 0.5 * weightsSH[i, j* 4 + 3 + n_sin_waves] * positions[time_step, j][1]
+            activation += 0.25 * weightsSH[i, j* 4 + 2 + n_sin_waves] * positions[time_step, j][1]
+            activation += 0.25 * weightsSH[i, j* 4 + 3 + n_sin_waves] * positions[time_step, j][1]
         
         # goal sensors -> how far the bot got?
-        activation += 0.5 * weightsSH[i, n_objects * 4 + n_sin_waves] * (goal[None][0] - center[0][time_step])
-        activation += 0.5 * weightsSH[i, n_objects * 4 + n_sin_waves + 1] * (goal[None][1] - center[1][time_step])
+        activation += 0.25 * weightsSH[i, n_objects * 4 + n_sin_waves] * (goal[None][0] - center[time_step][0])
+        activation += 0.25 * weightsSH[i, n_objects * 4 + n_sin_waves + 1] * (goal[None][1] - center[time_step][1])
             
         # Apply non-linearity
         activation += bias_hidden[i]
@@ -333,9 +492,8 @@ def simulate_springs(time_step: tai.i32):
         # TODO: Adapt the force_of_piston constant to be an actual variable
         # spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * tai.sin(0.9*time_step)
         
-        # Newer version takes the motorized action form the NN
+        # Newer version takes the motorized action form the NN. Keep value small
         spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * actuation[time_step, spring_idx]
-        
         
         # Difference between current and supposed initial at that index
         spring_difference = curr_rest_length - spring_resting_length
@@ -347,8 +505,8 @@ def simulate_springs(time_step: tai.i32):
         spring_restoring_forces[time_step, spring_idx] = (dt * spring_difference  * stiffness / curr_rest_length) * distance_a_b
         
         # Apply the force. - symbol means pulling force
-        spring_forces_on_objects[time_step, object_a_index] += - spring_restoring_forces[time_step, spring_idx]
-        spring_forces_on_objects[time_step, object_b_index] +=   spring_restoring_forces[time_step, spring_idx]
+        spring_forces_on_objects[time_step, object_a_index] +=  -2.5 * spring_restoring_forces[time_step, spring_idx]
+        spring_forces_on_objects[time_step, object_b_index] +=  2.5 * spring_restoring_forces[time_step, spring_idx]
         
 # -------------------------------------------------------------
 
@@ -384,14 +542,59 @@ def step_one(time_step: tai.i32):
     simulate_neural_network_HM(time_step)
     simulate_springs(time_step)
     simulate_objects(time_step)
+    
+# -------------------------------------------------------------
+def tune_hm_weights():
+    for i in range(n_springs):
+        for j in range(n_hidden_neurons):
+            weightsHM[i, j] -= learning_rate * weightsHM.grad[i,j]
+                
+def tune_hidden_layer_biases():
+    for i in range(n_hidden_neurons):
+        bias_hidden[i] -= learning_rate * bias_hidden.grad[i]
+        
+def tune_sh_weights():
+    for i in range(n_hidden_neurons):
+        
+        for j in tai.static(range(n_sin_waves)): 
+            
+            # Each of these variables has a gradient associated with it.
+            weightsSH[i,j] -= learning_rate * weightsSH.grad[i,j]
+            
+        # Simulate the sensors inside the objects
+        # First 2 sensors -> 'proprioceptive sensors'. Indicate position of that object wrt robots center of mass.
+        for j in tai.static(range(n_objects)):
 
+            # Add to i-th neuron, the horizontal dist between j-th object and bot's center
+            weightsSH[i, j* 4 + n_sin_waves]        -= learning_rate * weightsSH.grad[i, j* 4 + n_sin_waves]
+            
+            # Add to i-th neuron, the vertical dist between j-th object and bot's center
+            weightsSH[i, j* 4 + 1 + n_sin_waves]    -= learning_rate * weightsSH.grad[i, j* 4 + 1 + n_sin_waves] 
+            
+            weightsSH[i, j* 4 + 2 + n_sin_waves]    -= learning_rate * weightsSH.grad[i, j* 4 + 2 + n_sin_waves]
+            weightsSH[i, j* 4 + 3 + n_sin_waves]    -= learning_rate * weightsSH.grad[i, j* 4 + 3 + n_sin_waves]
+        
+        # goal sensors -> how far the bot got?
+        weightsSH[i, n_objects * 4 + n_sin_waves]       -= learning_rate * weightsSH.grad[i, n_objects * 4 + n_sin_waves]
+        weightsSH[i, n_objects * 4 + n_sin_waves + 1]   -= learning_rate * weightsSH.grad[i, n_objects * 4 + n_sin_waves + 1] 
+        
+def tune_robots_brain():
+    
+    # Fine-tune hidden to motor layer
+    tune_hm_weights()
+
+    # Fine-tune the bias
+    tune_hidden_layer_biases()
+        
+    # Fine-tune sensor to hidden layer
+    tune_sh_weights()
             
 # -------------------------------------------------------------
+
 # Create Video
 def Create_video():
     os.system("rm movie.p4")
     os.system(" ffmpeg -i images/test_%d.png movie.mp4")
-
 
 # -------------------------------------------------------------
 
@@ -399,25 +602,37 @@ def run_simulation():
     Initialize()
 
     # Automated Differentiation.
-    with tai.ad.Tape(loss):
+    with tai.Tape(loss):
         
         Simulate()
         
-        # In our case dLoss / dPosition
-        # Compute_loss()
-        
-    os.system("rm images/*.png")
-    Draw(0)
+        loss[None] = 0.0
+        Compute_loss()
 
-    # Based on our loss. We have dLoss/dPosition, which is positions.grad[0,0][1]
-    # Update in the opposite direction of the gradient to minimize the loss
-    # startingObjectPositions[0] += 0.1 * positions.grad[0,0]
+    print(loss[None])
 
-    # Initialize()
-    # Simulate()
-    # Draw(max_steps)
-    Create_video()
+
+Initialize_Neural_Network()
+
+# Run simulation
+for opt_step in range(15):
     
-run_simulation()
+    run_simulation()
+    
+    if opt_step == 0:
+        os.system("rm images/*.png")
+        Draw(0)
+        
+    tune_robots_brain()
+
+Draw(max_steps)
+
+# run_simulation()
+    
+# os.system("rm images/*.png")
+# Draw(0)
+
+# Create the video
+Create_video()
 
 
