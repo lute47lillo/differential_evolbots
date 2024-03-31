@@ -12,13 +12,13 @@ import random
 # TODO: Taichi's Fields documentation !
 
 max_steps = 200
-ground_height = 0.05
+ground_height = 0.02
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.8
 learning_rate = 1
 
-damping = 0.4 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.6 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 
 # Objects connected by Springs
 startingObjectPositions = []
@@ -493,7 +493,7 @@ def simulate_springs(time_step: tai.i32):
         # spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * tai.sin(0.9*time_step)
         
         # Newer version takes the motorized action form the NN. Keep value small
-        spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * actuation[time_step, spring_idx]
+        spring_resting_length = spring_resting_length + 0.07 * spring_actuation[spring_idx] * actuation[time_step, spring_idx]
         
         # Difference between current and supposed initial at that index
         spring_difference = curr_rest_length - spring_resting_length
@@ -505,8 +505,8 @@ def simulate_springs(time_step: tai.i32):
         spring_restoring_forces[time_step, spring_idx] = (dt * spring_difference  * stiffness / curr_rest_length) * distance_a_b
         
         # Apply the force. - symbol means pulling force
-        spring_forces_on_objects[time_step, object_a_index] +=  -2.5 * spring_restoring_forces[time_step, spring_idx]
-        spring_forces_on_objects[time_step, object_b_index] +=  2.5 * spring_restoring_forces[time_step, spring_idx]
+        spring_forces_on_objects[time_step, object_a_index] +=  -1.5 * spring_restoring_forces[time_step, spring_idx]
+        spring_forces_on_objects[time_step, object_b_index] +=  1.5 * spring_restoring_forces[time_step, spring_idx]
         
 # -------------------------------------------------------------
 
@@ -615,7 +615,7 @@ def run_simulation():
 Initialize_Neural_Network()
 
 # Run simulation
-for opt_step in range(15):
+for opt_step in range(10):
     
     run_simulation()
     
