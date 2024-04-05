@@ -11,27 +11,44 @@ import random
 # move the object to max use the taichi's differentiable routine.
 # TODO: Taichi's Fields documentation !
 
+"""
+    GLOBAL VARIABLES
+"""
 max_steps = 200
-ground_height = 0.02
+ground_height = 0.05
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.8
 learning_rate = 1
-
+x_offset = 0.1 # How far from left screen robot starts
 damping = 0.6 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 
+
+"""
+    UTIL FUNCTIONS
+"""
 # Objects connected by Springs
 startingObjectPositions = []
-
-# Create the springs to connect two 'links'
-# x_offset = 0.1
-# for _ in range(2):
-#     startingObjectPositions.append([x_offset, ground_height+0.1])
-#     startingObjectPositions.append([x_offset, ground_height+0.2])
-#     x_offset += 0.1
-    
-springs = []
-def create_spring(i, j, is_motor):
+# springs = []
+# -----------------------------------------------------------------
+def create_spring(springs_robot, i, j, is_motor):
+    """
+        Definition
+        -----------
+            Create a spring between objects at index i-th and j-th in the list startingObjectPositions. 
+            Can be either motorized or not. Appends to list of springs.
+            
+        Parameters
+        -----------
+            - springs_robot (list): list of information of the generated robot.
+            - i (int): object at index i-th in startingObjectPositions
+            - j (int): object at index j-th in startingObjectPositions
+            - is_motor (int): if the spring is motorized or not.
+            
+        Returns
+        -----------
+            None
+    """
     
     object_a = startingObjectPositions[i]
     object_b = startingObjectPositions[j]
@@ -45,112 +62,69 @@ def create_spring(i, j, is_motor):
     distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
     resting_length = distance_A_to_B
     
-    springs.append([i, j, resting_length, is_motor])
+    springs_robot.append([i, j, resting_length, is_motor])
 
+# -----------------------------------------------------------------
 
-def create_hw5_robot():
-    x_offset = 0.1
+def simulate_robot(robot_index):
+    """
+        Definition
+        -----------
+            Creates an individual random robot within an initialized population.
+            Morphology initial search space is max'd at 6 objects. Minimum of 2 objects.
+            
+        Parameters
+        -----------
+            - robot_index (int): Indicating the index of the robot in the population.
+            
+        Returns
+        -----------
+            - springs_robot (list): list of information of the generated robot.
+    """
+    springs_robot = []
     
-    # Vertical I
-    startingObjectPositions.append([x_offset-0.05, ground_height+0.1]) # 0
-    startingObjectPositions.append([x_offset, ground_height+0.2]) # 1
-    startingObjectPositions.append([x_offset, ground_height+0.3]) # 2
-    startingObjectPositions.append([x_offset+0.2, ground_height+0.5]) # 3
+    # First object is always given.
+    startingObjectPositions.append([x_offset, ground_height])
     
-    create_spring(0, 1, 1)
-    create_spring(1, 2, 1)
+    # How many more are created?
+    total_objects = random.randint(1, 5)
     
-    # horizontal Top.1
-    startingObjectPositions.append([x_offset+0.1, ground_height+0.3]) # 4
-    startingObjectPositions.append([x_offset+0.2, ground_height+0.3]) # 5
-    startingObjectPositions.append([x_offset+0.4, ground_height+0.3]) # 6
-    
-    create_spring(1, 4, 0)
-    create_spring(2, 4, 0)
-    create_spring(4, 5, 1)
-    
-    
-    # horizontal Top.2
-    startingObjectPositions.append([x_offset+0.1, ground_height+0.4]) # 7
-    startingObjectPositions.append([x_offset+0.2, ground_height+0.4]) # 8
-    startingObjectPositions.append([x_offset+0.3, ground_height+0.4]) # 9
-    
-    create_spring(3, 7, 1)
-    create_spring(3, 8, 0)
-    create_spring(3, 9, 1)
-    create_spring(7, 8, 0)
-    create_spring(8, 9, 0)
-    create_spring(9, 6, 1)
-    
-    create_spring(2, 7, 1)
-    create_spring(4, 7, 0)
-    create_spring(4, 8, 0)
-    create_spring(5, 7, 0)
-    create_spring(5, 8, 0)
-    create_spring(5, 9, 0)
-   
-    # HorizontalBottom.1
-    startingObjectPositions.append([x_offset+0.3, ground_height+0.2]) # 10
-    startingObjectPositions.append([x_offset+0.4, ground_height+0.2]) # 11
-    
-    create_spring(10, 6, 0)
-    create_spring(10, 11, 0)
-    create_spring(11, 6, 1)
+    # Generate objects
+    for _ in range(total_objects):
+        
+        # Generate random x_pos and y_pos
+        obj_x_pos = random.uniform(0, 0.4)
+        obj_y_pos = random.uniform(0, 0.4)
+        
+        # Check there is no object in same x and y.
+        for created_obj in startingObjectPositions:
+            x, y = created_obj
+            # Add an arbitrary offset to undraw
+            if x == obj_x_pos and y == obj_y_pos:
+                obj_x_pos += 0.05
+                obj_y_pos += 0.05
+        
+        # Add object
+        startingObjectPositions.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
+        
+    # Generate Springs. Randomly select if they are motorized or not.
+    for i in range(len(startingObjectPositions)):
+        for j in range(i+1, len(startingObjectPositions)):
+            is_motor = random.choice([0, 1])
+            create_spring(springs_robot, i, j, is_motor)
+ 
+    # Write information of the robot morphology to text
+    with open(f"population/robot_{robot_index}.txt", 'a') as file:
+        for sublist in springs_robot:
+            line = ' '.join(map(str, sublist)) + '\n'
+            file.write(line)
+        # line = ' '.join(map(str, springs_robot)) + '\n'
+        # file.write(line)
+ 
+    return springs_robot
 
-    
-    
-    # Horizontal bottom toe
-    startingObjectPositions.append([x_offset+0.4, ground_height+0.1]) # 12
-    startingObjectPositions.append([x_offset+0.45, ground_height+0.1]) # 13
-    
-    # Extra back leg support
-    startingObjectPositions.append([x_offset+0.15, ground_height+0.1]) # 14
-
-    
-    # Extra front leg
-    startingObjectPositions.append([x_offset+0.25, ground_height+0.1]) # 15
-    startingObjectPositions.append([x_offset+0.3, ground_height+0.1]) # 16
-    create_spring(10, 15, 1)
-    create_spring(10, 16, 1)
-    create_spring(11, 12, 1)
-    create_spring(11, 13, 1)
-    create_spring(12, 13, 0)
-    create_spring(16, 12, 0)
-    create_spring(16, 15, 0)
-    
-    # Extra back leg
-    startingObjectPositions.append([x_offset+0.1, ground_height+0.2]) # 17
-    # create_spring(17, 0, 1)
-    create_spring(17, 1, 0)
-    create_spring(17, 2, 0)
-    create_spring(14, 17, 1)
-    create_spring(4, 17, 1)
-    
-    # Fixing middle
-    startingObjectPositions.append([x_offset+0.3, ground_height+0.3]) # 18
-    create_spring(18, 10, 1)
-    create_spring(18, 6, 0)
-    create_spring(18, 11, 0)
-    create_spring(18, 9, 0)
-    create_spring(18, 8, 0)
-    create_spring(18, 5, 1)
-    
-    # Extra back 2
-    startingObjectPositions.append([x_offset, ground_height+0.1]) # 19
-    startingObjectPositions.append([x_offset+0.1, ground_height+0.1]) # 20
-    
-    create_spring(19, 0, 0)
-    create_spring(19, 1, 1)
-    create_spring(14, 20, 0)
-    create_spring(17, 20, 1)
-    create_spring(19, 20, 0)
-    
-    
-    
-create_hw5_robot()
-n_objects = len(startingObjectPositions)
+springs = simulate_robot(0)
 # -------------------------------------------------------------
-
 
 # Create a field w/ max_steps X n_objects entries.
 # It is stored in positions. Needs to be defined previously
@@ -161,35 +135,9 @@ vec =  lambda: tai.Vector.field(2, dtype=real)
 
 # -------------------------------------------------------------
 
-# Append to springs.
-# Get objects
-    
-# for i in range(n_objects):
-    
-#     for j in range(i+1, n_objects):
-#         object_a = startingObjectPositions[i]
-#         object_b = startingObjectPositions[j]
-
-#         # Get x and y coordinates of objects to calculate distance
-#         x_distanceAB = object_a[0] - object_b[0]
-#         y_distanceAB = object_a[1] - object_b[1]
-
-#         # Pythagorean Distance.
-#         # Springs need a "at rest"-length that is the length that "likes" to stay at.
-#         distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
-#         resting_length = distance_A_to_B
-
-#         # Strings are defined as pair of Ints of index of the objets to be joined. [object_indexA, object_indexB, resting_length]
-#         springs.append([i, j, resting_length, 0])
-
-# is_motor = [1, 1, 1, 0, 0, 0, 0, 0, 1, 0]
+n_objects = len(startingObjectPositions)
 n_springs = len(springs)
-# is_motor = [random.randint(0, 1) for _ in range(n_springs)]
 
-# # Add motors to springs
-# for i in range(n_springs):
-#     springs[i][3] = is_motor[i]
-    
 # Store as Taichi fields
 spring_anchor_a = tai.field(tai.i32)
 spring_anchor_b = tai.field(tai.i32)
@@ -599,6 +547,8 @@ def Create_video():
 # -------------------------------------------------------------
 
 def run_simulation():
+      
+    # Initialize the robot.
     Initialize()
 
     # Automated Differentiation.
@@ -615,7 +565,7 @@ def run_simulation():
 Initialize_Neural_Network()
 
 # Run simulation
-for opt_step in range(10):
+for opt_step in range(2):
     
     run_simulation()
     
@@ -627,7 +577,6 @@ for opt_step in range(10):
 
 Draw(max_steps)
 
-# run_simulation()
     
 # os.system("rm images/*.png")
 # Draw(0)
