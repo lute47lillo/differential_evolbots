@@ -27,8 +27,16 @@ damping = 0.6 # Is a constant that controls how much you slow the velocity of th
 """
     UTIL FUNCTIONS
 """
-# Objects connected by Springs
-# springs = []
+# -----------------------------------------------------------------
+
+# Create a field w/ max_steps X n_objects entries.
+# It is stored in positions. Needs to be defined previously
+#Vector of length 2. Real Values
+real = tai.f32
+tai.init(default_fp = real) # Init TAI
+vec =  lambda: tai.Vector.field(2, dtype=real) 
+
+
 # -----------------------------------------------------------------
 def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
     """
@@ -43,6 +51,7 @@ def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
             - i (int): object at index i-th in startingObjectPositions
             - j (int): object at index j-th in startingObjectPositions
             - is_motor (int): if the spring is motorized or not.
+            - startingObjectPositions (list): List of objects of the specific robot.
             
         Returns
         -----------
@@ -65,6 +74,7 @@ def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
 
 # -----------------------------------------------------------------
 
+# TODO: Delete the files of population/ to be from sracth on every new run.
 def simulate_robot(robot_index):
     """
         Definition
@@ -79,6 +89,7 @@ def simulate_robot(robot_index):
         Returns
         -----------
             - springs_robot (list): list of information of the generated robot.
+            - startingObjectPositions (list): List of objects of the specific robot.
     """
     springs_robot = []
     startingObjectPositions = []
@@ -123,8 +134,23 @@ def simulate_robot(robot_index):
  
     return springs_robot, startingObjectPositions
 
+# -----------------------------------------------------------------
+
 def create_population(n_robots_population):
-    
+    """
+        Definition
+        -----------
+            Creates a population of individual robots.
+            
+        Parameters
+        -----------
+            - n_robots_population (int): Indicates the number of robots in the population.
+            
+        Returns
+        -----------
+            - springs_robot_population (List[list]): List of lists of information of the generated robot.
+            - startingObjectPositions (List[list]): List of lists of objects of the specific robot.
+    """
     springs_population = []
     startingObjectPositions_population = []
     
@@ -136,30 +162,83 @@ def create_population(n_robots_population):
     
     return springs_population, startingObjectPositions_population
 
-springs_population, startingObjectPositions_population = create_population(5)   
+# TODO: Aa placeholder - Create a Population of 2 robots
+springs_population, startingObjectPositions_population = create_population(2)   
+
 
 # Placeholder, get data of first robots  
 springs = springs_population[0]
 startingObjectPositions = startingObjectPositions_population[0]
-# -------------------------------------------------------------
 
-# Create a field w/ max_steps X n_objects entries.
-# It is stored in positions. Needs to be defined previously
-#Vector of length 2. Real Values
-real = tai.f32
-tai.init(default_fp = real) # Init TAI
-vec =  lambda: tai.Vector.field(2, dtype=real) 
+# -----------------------------------------------------------------
 
-# -------------------------------------------------------------
+def init_robot_objects_ds(startingObjectPositions, vec):
+    n_objects = len(startingObjectPositions)
+    
+    # Store positions of every object at every time step.
+    # Where each position is a vector of length 2. x and y.
+    positions = vec()
+    tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions)
+
+    # Gradients of position. Changing as a function of the loss per time step.
+    tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions.grad)
+
+    velocities = vec()
+    tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
+    
+    # Forces acting on the objects
+    spring_forces_on_objects = vec()
+    tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
+
+    return positions, velocities, spring_forces_on_objects
+
+positions, velocities, spring_forces_on_objects = init_robot_objects_ds(startingObjectPositions, vec)
+
+# -----------------------------------------------------------------
+
+def init_robot_springs_ds(springs, vec):
+    n_springs = len(springs)
+    
+    # Store as Taichi fields
+    spring_anchor_a = tai.field(tai.i32)
+    spring_anchor_b = tai.field(tai.i32)
+    spring_at_rest_length = tai.field(tai.f32)
+    spring_actuation = tai.field(tai.i32)
+    
+    # Capture motor value to be sent to every spring at every time_step
+    actuation = tai.field(tai.f32)
+    tai.root.dense(tai.ij, (max_steps, n_springs)).place(actuation)
+    
+    # Taichi Structure for springs. Turn Spring anchor A & B from integer into field
+    tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length, spring_actuation) 
+
+    # Forces of the springs
+    spring_restoring_forces = vec()
+    tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_forces)
+    
+    spring_anchors = (spring_anchor_a, spring_anchor_b)
+
+    return spring_anchors, spring_at_rest_length, spring_actuation, spring_restoring_forces, actuation
+
+spring_anchors, spring_at_rest_length, spring_actuation, spring_restoring_forces, actuation = init_robot_springs_ds(springs, vec)
+spring_anchor_a, spring_anchor_b = spring_anchors
+
+# -----------------------------------------------------------------
+
+
+
+
+
+
 
 n_objects = len(startingObjectPositions)
 n_springs = len(springs)
 
-# Store as Taichi fields
-spring_anchor_a = tai.field(tai.i32)
-spring_anchor_b = tai.field(tai.i32)
-spring_at_rest_length = tai.field(tai.f32)
-spring_actuation = tai.field(tai.i32) # Wheter or not the spring contains a piston motor that deals with the length. Binary value
+# # Store as Taichi fields
+# spring_anchor_a = tai.field(tai.i32)
+# spring_anchor_b = tai.field(tai.i32)
+# spring_at_rest_length = tai.field(tai.f32)
+# spring_actuation = tai.field(tai.i32) # Wheter or not the spring contains a piston motor that deals with the length. Binary value
 
 # -------------------------------------------------------------
 # NEURAL NETWORK 
@@ -182,32 +261,31 @@ tai.root.dense(tai.ij, (n_hidden_neurons, n_sensors())).place(weightsSH)
 weightsHM = tai.field(tai.f32)
 tai.root.dense(tai.ij, (n_springs, n_hidden_neurons)).place(weightsHM)
 
-# Capture motor value to be sent to every spring at every time_step
-actuation = tai.field(tai.f32)
-tai.root.dense(tai.ij, (max_steps, n_springs)).place(actuation)
+# # Capture motor value to be sent to every spring at every time_step
+# actuation = tai.field(tai.f32)
+# tai.root.dense(tai.ij, (max_steps, n_springs)).place(actuation)
 # -------------------------------------------------------------
 # Store positions of every object at every time step.
 # Where each position is a vector of length 2. x and y.
-positions = vec()
-tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions)
+# positions = vec()
+# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions)
 
-# Gradients of position. Changing as a function of the loss per time step.
-tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions.grad)
+# # Gradients of position. Changing as a function of the loss per time step.
+# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions.grad)
 
+# velocities = vec()
+# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
 
-velocities = vec()
-tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
+# # Taichi Structure for springs. Turn Spring anchor A & B from integer into field
+# tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length, spring_actuation) 
 
-# Taichi Structure for springs. Turn Spring anchor A & B from integer into field
-tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length, spring_actuation) 
-
-# Forces of the springs
-spring_restoring_forces = vec()
-tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_forces)
+# # Forces of the springs
+# spring_restoring_forces = vec()
+# tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_forces)
 
 # Forces acting on the objects
-spring_forces_on_objects = vec()
-tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
+# spring_forces_on_objects = vec()
+# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
 
 # -------------------------------------------------------------
 # Determines center of the bot by the time_step
