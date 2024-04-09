@@ -95,6 +95,7 @@ def simulate_robot(robot_index):
             - springs_robot (list): list of information of the generated robot.
             - startingObjectPositions (list): List of objects of the specific robot.
     """
+    
     springs_robot = []
     startingObjectPositions = []
     
@@ -167,6 +168,8 @@ def create_population(n_robots_population):
     return springs_population, startingObjectPositions_population
 
 # TODO: Aa placeholder - Create a Population of 2 robots
+# Delete old experimental population
+os.system("rm population/*.txt")
 springs_population, startingObjectPositions_population = create_population(2)   
 
 
@@ -259,27 +262,30 @@ def init_robot_weights_ds(startingObjectPositions, n_hidden_neurons):
 weightsSH, weightsHM, hidden, bias_hidden = init_robot_weights_ds(startingObjectPositions, n_hidden_neurons)
 
 # -------------------------------------------------------------
+def init_robot_goal(vec):
+    
+    goal = vec()
+    tai.root.place(goal)
+    
+    return goal
 
-
+# TODO: Adapt based on the robot task
+def init_robot_center(vec):
+    
+    center = vec()
+    tai.root.dense(tai.i, max_steps).place(center)
+    
+    return center
 # -------------------------------------------------------------
+
 # Determines center of the bot by the time_step
-center = vec()
-tai.root.dense(tai.i, max_steps).place(center)
-
+center = init_robot_center(vec)
 # Determine the goal of the robot.
-goal = vec()
-tai.root.place(goal)
-
-# # Create field for N hidden neurons at each time_step
-# hidden = tai.field(tai.f32)
-# tai.root.dense(tai.ij, [max_steps, n_hidden_neurons]).place(hidden)
-
-# # Create bias. One per each hidden neuron. Total N bias
-# bias_hidden = tai.field(tai.f32)
-# tai.root.dense(tai.i, n_hidden_neurons).place(bias_hidden)
+goal = init_robot_goal(vec)
 
 # -------------------------------------------------------------
 loss = tai.field(dtype=tai.f32, shape=()) # 0-D tensor
+
 # Gradients
 tai.root.lazy_grad()
 
@@ -652,5 +658,3 @@ Draw(max_steps)
 
 # Create the video
 Create_video()
-
-
