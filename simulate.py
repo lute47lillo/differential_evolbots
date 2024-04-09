@@ -22,7 +22,8 @@ gravity = -9.8
 learning_rate = 1
 x_offset = 0.1 # How far from left screen robot starts
 damping = 0.6 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
-
+n_hidden_neurons = 32
+n_sin_waves = 10
 
 """
     UTIL FUNCTIONS
@@ -35,6 +36,9 @@ damping = 0.6 # Is a constant that controls how much you slow the velocity of th
 real = tai.f32
 tai.init(default_fp = real) # Init TAI
 vec =  lambda: tai.Vector.field(2, dtype=real) 
+
+def n_sensors(n_objects):
+    return n_sin_waves + 4 * n_objects + 2
 
 
 # -----------------------------------------------------------------
@@ -170,6 +174,9 @@ springs_population, startingObjectPositions_population = create_population(2)
 springs = springs_population[0]
 startingObjectPositions = startingObjectPositions_population[0]
 
+n_objects = len(startingObjectPositions)
+n_springs = len(springs)
+
 # -----------------------------------------------------------------
 
 def init_robot_objects_ds(startingObjectPositions, vec):
@@ -223,69 +230,36 @@ def init_robot_springs_ds(springs, vec):
 spring_anchors, spring_at_rest_length, spring_actuation, spring_restoring_forces, actuation = init_robot_springs_ds(springs, vec)
 spring_anchor_a, spring_anchor_b = spring_anchors
 
-# -----------------------------------------------------------------
+# -------------------------------------------------------------
 
+# TODO: Make controller also modifiable in size
+def init_robot_weights_ds(startingObjectPositions, n_hidden_neurons):
+    
+    # Attributes
+    n_objects = len(startingObjectPositions)
+    
+    # Sensor to Hidden neurons and weights - Put weights from Sensors to hidden neurons
+    weightsSH = tai.field(tai.f32)
+    tai.root.dense(tai.ij, (n_hidden_neurons, n_sensors(n_objects))).place(weightsSH)
 
+    # Hidden to Motor neurons and weights
+    weightsHM = tai.field(tai.f32)
+    tai.root.dense(tai.ij, (n_springs, n_hidden_neurons)).place(weightsHM)
+    
+    # Create field for N hidden neurons at each time_step
+    hidden = tai.field(tai.f32)
+    tai.root.dense(tai.ij, [max_steps, n_hidden_neurons]).place(hidden)
 
+    # Create bias. One per each hidden neuron. Total N bias
+    bias_hidden = tai.field(tai.f32)
+    tai.root.dense(tai.i, n_hidden_neurons).place(bias_hidden)
+    
+    return weightsSH, weightsHM, hidden, bias_hidden
 
-
-
-
-n_objects = len(startingObjectPositions)
-n_springs = len(springs)
-
-# # Store as Taichi fields
-# spring_anchor_a = tai.field(tai.i32)
-# spring_anchor_b = tai.field(tai.i32)
-# spring_at_rest_length = tai.field(tai.f32)
-# spring_actuation = tai.field(tai.i32) # Wheter or not the spring contains a piston motor that deals with the length. Binary value
+weightsSH, weightsHM, hidden, bias_hidden = init_robot_weights_ds(startingObjectPositions, n_hidden_neurons)
 
 # -------------------------------------------------------------
-# NEURAL NETWORK 
 
-# Sensor to Hidden neurons and weights
-weightsSH = tai.field(tai.f32)
-
-# Arbitrary choices
-n_hidden_neurons = 32
-n_sin_waves = 10
-
-def n_sensors():
-    # Simulate Central Pattern Generators (CPPNS). 4 sensors per objects. 2 global sensors (horizontal and vertical dist)
-    return n_sin_waves + 4 * n_objects + 2
-
-# Put weights from Sensors to hidden neurons
-tai.root.dense(tai.ij, (n_hidden_neurons, n_sensors())).place(weightsSH)
-
-# Hidden to Motor neurons and weights
-weightsHM = tai.field(tai.f32)
-tai.root.dense(tai.ij, (n_springs, n_hidden_neurons)).place(weightsHM)
-
-# # Capture motor value to be sent to every spring at every time_step
-# actuation = tai.field(tai.f32)
-# tai.root.dense(tai.ij, (max_steps, n_springs)).place(actuation)
-# -------------------------------------------------------------
-# Store positions of every object at every time step.
-# Where each position is a vector of length 2. x and y.
-# positions = vec()
-# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions)
-
-# # Gradients of position. Changing as a function of the loss per time step.
-# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(positions.grad)
-
-# velocities = vec()
-# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(velocities)
-
-# # Taichi Structure for springs. Turn Spring anchor A & B from integer into field
-# tai.root.dense(tai.i, n_springs).place(spring_anchor_a, spring_anchor_b, spring_at_rest_length, spring_actuation) 
-
-# # Forces of the springs
-# spring_restoring_forces = vec()
-# tai.root.dense(tai.i, max_steps).dense(tai.j, n_springs).place(spring_restoring_forces)
-
-# Forces acting on the objects
-# spring_forces_on_objects = vec()
-# tai.root.dense(tai.i, max_steps).dense(tai.j, n_objects).place(spring_forces_on_objects)
 
 # -------------------------------------------------------------
 # Determines center of the bot by the time_step
@@ -296,13 +270,13 @@ tai.root.dense(tai.i, max_steps).place(center)
 goal = vec()
 tai.root.place(goal)
 
-# Create field for N hidden neurons at each time_step
-hidden = tai.field(tai.f32)
-tai.root.dense(tai.ij, [max_steps, n_hidden_neurons]).place(hidden)
+# # Create field for N hidden neurons at each time_step
+# hidden = tai.field(tai.f32)
+# tai.root.dense(tai.ij, [max_steps, n_hidden_neurons]).place(hidden)
 
-# Create bias. One per each hidden neuron. Total N bias
-bias_hidden = tai.field(tai.f32)
-tai.root.dense(tai.i, n_hidden_neurons).place(bias_hidden)
+# # Create bias. One per each hidden neuron. Total N bias
+# bias_hidden = tai.field(tai.f32)
+# tai.root.dense(tai.i, n_hidden_neurons).place(bias_hidden)
 
 # -------------------------------------------------------------
 loss = tai.field(dtype=tai.f32, shape=()) # 0-D tensor
@@ -426,7 +400,7 @@ def Initialize():
             
     goal[None] = [0.9, 0.2]
         
-def Initialize_Neural_Network():
+def Initialize_Neural_Network(n_objects):
     """
          Definition
         -----------
@@ -434,7 +408,7 @@ def Initialize_Neural_Network():
     """
     # Initialize sensor to hidden neurons
     for i in range(n_hidden_neurons):
-        for j in range(n_sensors()):
+        for j in range(n_sensors(n_objects)):
             weightsSH[i,j] = np.random.randn() * 0.2 - 0.1
     
     # Init bias for hidden neurons
@@ -657,7 +631,7 @@ def run_simulation():
     print(loss[None])
 
 
-Initialize_Neural_Network()
+Initialize_Neural_Network(n_objects)
 
 # Run simulation
 for opt_step in range(2):
