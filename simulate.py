@@ -28,10 +28,9 @@ damping = 0.6 # Is a constant that controls how much you slow the velocity of th
     UTIL FUNCTIONS
 """
 # Objects connected by Springs
-startingObjectPositions = []
 # springs = []
 # -----------------------------------------------------------------
-def create_spring(springs_robot, i, j, is_motor):
+def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
     """
         Definition
         -----------
@@ -82,6 +81,7 @@ def simulate_robot(robot_index):
             - springs_robot (list): list of information of the generated robot.
     """
     springs_robot = []
+    startingObjectPositions = []
     
     # First object is always given.
     startingObjectPositions.append([x_offset, ground_height])
@@ -111,19 +111,36 @@ def simulate_robot(robot_index):
     for i in range(len(startingObjectPositions)):
         for j in range(i+1, len(startingObjectPositions)):
             is_motor = random.choice([0, 1])
-            create_spring(springs_robot, i, j, is_motor)
+            create_spring(springs_robot, i, j, is_motor, startingObjectPositions)
  
     # Write information of the robot morphology to text
-    with open(f"population/robot_{robot_index}.txt", 'a') as file:
+    with open(f"population/robot_{robot_index}.txt", 'w') as file:
         for sublist in springs_robot:
             line = ' '.join(map(str, sublist)) + '\n'
             file.write(line)
         # line = ' '.join(map(str, springs_robot)) + '\n'
         # file.write(line)
  
-    return springs_robot
+    return springs_robot, startingObjectPositions
 
-springs = simulate_robot(0)
+def create_population(n_robots_population):
+    
+    springs_population = []
+    startingObjectPositions_population = []
+    
+    # Simulate individual robot and gather springs
+    for idx_robot in range(n_robots_population):
+        springs, startingObjectPositions = simulate_robot(idx_robot)
+        springs_population.append(springs)   
+        startingObjectPositions_population.append(startingObjectPositions) 
+    
+    return springs_population, startingObjectPositions_population
+
+springs_population, startingObjectPositions_population = create_population(5)   
+
+# Placeholder, get data of first robots  
+springs = springs_population[0]
+startingObjectPositions = startingObjectPositions_population[0]
 # -------------------------------------------------------------
 
 # Create a field w/ max_steps X n_objects entries.
