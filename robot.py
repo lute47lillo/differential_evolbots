@@ -23,8 +23,8 @@ class Robot:
         real = tai.f32
         tai.init(default_fp = real) # Init TAI
         self.vec =  lambda: tai.Vector.field(2, dtype=real)  # Vector of length 2. Real Values
-        self.loss = tai.field(dtype=tai.f32, shape=()) # 0-D tensor
-        
+        self.loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
+        self.loss[None] = 100000
         # -----------------------------------------------------------------
         
         # Get common attributes -> Springs, objects and max_steps

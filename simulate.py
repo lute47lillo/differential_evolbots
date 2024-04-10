@@ -206,7 +206,6 @@ def Draw(frame_offset):
             tai_gui.circle((x,y), color=0x0, radius=7)
             
         # Draw the springs
- 
         for spring_idx in range(r.n_springs):
             object_a_index = r.spring_anchor_a[spring_idx]
             object_b_index = r.spring_anchor_b[spring_idx]
@@ -498,50 +497,130 @@ def Create_video():
 
 # -------------------------------------------------------------
 
+# Helper function to set indices of files back in range of 0...n_robot_population
+def re_order_files(directory, attr):
+    
+    # Get the list of files in the directory
+    files = os.listdir(directory)
+    
+    # Sort the files by their index in ascending order
+    files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+    
+    # Loop through the files and rename them
+    for idx, filename in enumerate(files):
+        old_path = os.path.join(directory, filename)
+        new_filename = f"{attr}_{idx}.txt"
+        new_path = os.path.join(directory, new_filename)
+        
+        # Rename the file only if its name is different from the new name
+        if filename != new_filename:
+            os.rename(old_path, new_path)
+            print(f"Renamed '{filename}' to '{new_filename}'")
+
+# -------------------------------------------------------------
+
+def save_fitness_loss(robot_index):
+    # Write information of the robot morphology to text
+    with open(f"fitness/loss_{robot_index}.txt", 'w') as file:
+        file.write(str(r.loss))
+        
+# -------------------------------------------------------------
+def eliminate_individual(n_robot_population):
+    
+    # Lowest fitness is in our case the highest positive value because we want to minimize it.
+    temp_lowest = -1000000
+    idx_robot_delete = 0
+    
+    for robot_index in range(n_robot_population):
+        with open(f"fitness/loss_{robot_index}.txt", 'r') as file:
+            temp_loss = file.read()
+            
+            # Check that loss of robot is higher than previous highest.
+            if float(temp_loss) > temp_lowest:
+                
+                # Save index of file to be deleted.
+                idx_robot_delete = robot_index
+                temp_lowest = float(temp_loss)
+                print(f"New Highest: {idx_robot_delete} - {temp_lowest}")
+    
+    # Delete population and fitness files
+    os.system(f"rm population/robot_{idx_robot_delete}.txt")
+    os.system(f"rm fitness/loss_{idx_robot_delete}.txt")
+        
+# -------------------------------------------------------------
+
+def mutate_population():
+    pass
+
+# -------------------------------------------------------------
+
 # Create population of robots
-n_robot_population = 2
+n_robot_population = 10
+simulation_total_steps = 2
 os.system("rm population/*.txt")
+os.system("rm fitness/*.txt")
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
+
+for simulation_step in range(simulation_total_steps):
     
-robot_drawing = []
-for robot_idx in range(n_robot_population):
-    print(f"Working on robot {robot_idx+1}")
-    
-    # Get objects and springs individual robots
-    springs = springs_population[robot_idx]
-    startingObjectPositions = startingObjectPositions_population[robot_idx]
+    robot_drawing = []
+    for robot_idx in range(n_robot_population):
+        print(f"Working on robot {robot_idx+1}")
         
-    r = Robot(springs, startingObjectPositions, max_steps)
-    
-    # Create loss of that robot
-    loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
-    tai.root.lazy_grad()
-    
-    for opt_step in range(2):        
-        
-        Initialize_Neural_Network()
-        Initialize()
-        
-        with tai.Tape(loss):
-        
-            # Simulate
-            Simulate()
-            loss[None] = 0.0
+        # Get objects and springs individual robots
+        springs = springs_population[robot_idx]
+        startingObjectPositions = startingObjectPositions_population[robot_idx]
             
-            Compute_loss()
-            
-        r.loss = float(loss[None])
-        print(f"Robot {robot_idx} - Opt Step {opt_step+1}. Loss: {r.loss}")
+        r = Robot(springs, startingObjectPositions, max_steps)
         
-        # Fine-tune the brain of the robot
-        # tune_robots_brain(weightsHM, weightsSH, bias_hidden)
-        tune_robots_brain()
+        # TODO: There has to be a more efficient way to do this, than to have 2 different losses being calculated.
+        # Create loss of that robot
+        loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
+        tai.root.lazy_grad()
         
-        if opt_step == 0:
-            os.system("rm images/*.png")
-            Draw(0)
+        for opt_step in range(4):        
             
-    loss[None] = 0.0
+            Initialize_Neural_Network()
+            Initialize()
+            
+            with tai.Tape(loss):
+            
+                # Simulate
+                Simulate()
+                loss[None] = 0.0
+                
+                Compute_loss()
+            
+            if loss[None] < r.loss[None]:
+                r.loss[None] = float(loss[None])
+                
+            print(f"Robot {robot_idx+1} - Opt Step {opt_step+1}. Loss: {loss[None]}")
+            
+            # Fine-tune the brain of the robot
+            tune_robots_brain()
+            
+            # TODO: It does not need to draw the first optimization step for all, but will need to save the values. 
+            # TODO: As of now, we might just draw the final optimization.
+            # Draw First Optimization Step
+            if opt_step == 0:
+                os.system("rm images/*.png")
+                Draw(0)
+            
+            # Save the fitness loss
+            save_fitness_loss(robot_idx)        
+
+    # Eliminate the lowest-ranked individual by fitness
+    eliminate_individual(n_robot_population)
+    
+    # Re-order file indices for simplicity
+    re_order_files("population", "robot")
+    re_order_files("fitness", "loss")
+            
+    # Set new number of individuals in population
+    n_robot_population -= 1
+            
+    # Mutate remaining individuals
+    mutate_population()
     
 Draw(max_steps)
     
