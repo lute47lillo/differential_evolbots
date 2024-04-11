@@ -2,7 +2,6 @@
 import taichi as tai
 import os
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import numpy as np
 import math
 import random
@@ -617,6 +616,7 @@ def add_object(robot_index):
         # Combine old and new objects
         total_obj_list = old_obj_pos + new_obj_pos
         all_lines[0] = str(total_obj_list) + '\n'
+        r.startingObjectPositions = total_obj_list
         
         # Generate Springs. Randomly select if they are motorized or not.
         # TODO: There should be a randomization, where not all objects are connected between springs (no matter if they are motor or not)
@@ -626,8 +626,9 @@ def add_object(robot_index):
                 if i < j:
                     is_motor = random.choice([0, 1])
                     create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
+        r.springs = new_springs_robot
     
-    print(f"New springs: {new_springs_robot}")
+    # print(f"New springs: {new_springs_robot}")
     
     # Write the modified contents back to the file
     with open(f"population/robot_{robot_index}.txt", 'w') as file:
@@ -638,9 +639,63 @@ def add_object(robot_index):
             all_lines.append(line)
             
         file.writelines(all_lines)
+
+def check_object_index(lines, object_index_remove):
     
-def remove_object(robot_idx):
-    pass
+    new_lines = []
+    for line in lines:
+        # Split the line into tokens
+        tokens = line.split()
+        
+        # Extract the first two tokens as integers
+        if len(tokens) >= 2:
+            first = int(tokens[0])
+            second = int(tokens[1])
+            
+            if first != object_index_remove and second != object_index_remove:
+                new_lines.append(line)
+
+    return new_lines
+
+def remove_object(robot_idx, n_robot_population):
+    
+    # As simulation runs increase, number of possible objects to be removed increases as well.
+    # TODO: Move this as a global.
+    initial_n_population = 20
+    max_obj_remove = int(math.sqrt(initial_n_population - n_robot_population))
+    n_remove_objects = random.randint(1, max_obj_remove)
+    
+    with open(f"population/robot_{robot_idx}.txt", 'r') as file:
+        # Delete randomly object index
+        all_lines = file.readlines()
+        
+        # Get object positions
+        old_obj_pos = eval(all_lines[0])
+        
+        for _ in range(n_remove_objects):
+            # Remove Obj position
+            object_index_remove = random.randint(0, len(r.startingObjectPositions))        
+            old_obj_pos = old_obj_pos.pop(object_index_remove)
+            
+            # Remove links containing that index
+            new_lines = check_object_index(all_lines[1:], object_index_remove)
+            
+        # Rewrite
+        all_lines[0] = str(old_obj_pos) + '\n'
+        
+    # TODO: Remoove from r.statrtin and r. spring
+        
+    # Write the modified contents back to the file. 
+    # TODO: The rewriting is not working properly
+    with open(f"population/robot_{robot_idx}.txt", 'w') as file:
+        file.write(all_lines[0])
+        
+        # Write springs information
+        for sublist in new_lines:
+            line = ' '.join(map(str, sublist)) + '\n'
+            file.write(line)
+    
+    
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
 # The better the loss has increased steadily, the more chances of doing nothing.
@@ -648,15 +703,14 @@ def mutate_population(n_robot_population):
     
     for robot_idx in range(n_robot_population):
         mutation_choice = random.randint(0,2)
-        
+
         if mutation_choice == 0:
             # Add an object - Spring
             add_object(robot_idx)
-            
+   
         elif mutation_choice == 1:
             # Remove an object - Spring
-            remove_object(robot_idx)
-
+            remove_object(robot_idx, n_robot_population)
 
 # -------------------------------------------------------------
 os.system("rm population/*.txt")
@@ -680,6 +734,7 @@ for simulation_step in range(simulation_total_steps):
         startingObjectPositions = startingObjectPositions_population[robot_idx]
             
         r = Robot(springs, startingObjectPositions, max_steps)
+        # print(f"Initial: {r.startingObjectPositions}")
         
         # TODO: There has to be a more efficient way to do this, than to have 2 different losses being calculated.
         # Create loss of that robot
