@@ -545,7 +545,7 @@ def eliminate_individual(n_robot_population):
                 # Save index of file to be deleted.
                 idx_robot_delete = robot_index
                 temp_lowest = float(temp_loss)
-                print(f"New Highest: {idx_robot_delete} - {temp_lowest}")
+                print(f"New Highest: {idx_robot_delete} -> {temp_lowest}")
     
     # Delete population and fitness files
     os.system(f"rm population/robot_{idx_robot_delete}.txt")
@@ -644,6 +644,7 @@ def check_object_index(lines, object_index_remove):
     
     new_lines = []
     for line in lines:
+        
         # Split the line into tokens
         tokens = line.split()
         
@@ -654,47 +655,68 @@ def check_object_index(lines, object_index_remove):
             
             if first != object_index_remove and second != object_index_remove:
                 new_lines.append(line)
-
+    
     return new_lines
 
 def remove_object(robot_idx, n_robot_population):
     
     # As simulation runs increase, number of possible objects to be removed increases as well.
-    # TODO: Move this as a global.
-    initial_n_population = 20
+    initial_n_population = 2 # TODO: Move this as a global.
     max_obj_remove = int(math.sqrt(initial_n_population - n_robot_population))
+
     n_remove_objects = random.randint(1, max_obj_remove)
     
     with open(f"population/robot_{robot_idx}.txt", 'r') as file:
+        
         # Delete randomly object index
         all_lines = file.readlines()
         
         # Get object positions
+        original_obj_size = len(r.startingObjectPositions)
         old_obj_pos = eval(all_lines[0])
-        
+        spring_lines = all_lines[1:]
         for _ in range(n_remove_objects):
-            # Remove Obj position
-            object_index_remove = random.randint(0, len(r.startingObjectPositions))        
-            old_obj_pos = old_obj_pos.pop(object_index_remove)
             
-            # Remove links containing that index
-            new_lines = check_object_index(all_lines[1:], object_index_remove)
+            # Check that there are more than 2 objects
+            if original_obj_size == 2:
+                
+                # Mutate by adding object
+                add_object(robot_idx)
+                return
             
+            else:
+                # Remove Obj position
+                object_index_remove = random.randint(1, len(r.startingObjectPositions)-1)     
+            
+                print(f"Object index to remove: {object_index_remove}")   
+                old_obj_pos.pop(object_index_remove)
+                
+                # Update objects
+                r.startingObjectPositions = old_obj_pos
+                
+                print(r.startingObjectPositions)
+                
+                # Remove links containing that index
+                spring_lines = check_object_index(spring_lines, object_index_remove)
+        
         # Rewrite
         all_lines[0] = str(old_obj_pos) + '\n'
         
-    # TODO: Remoove from r.statrtin and r. spring
-        
     # Write the modified contents back to the file. 
-    # TODO: The rewriting is not working properly
+    new_springs_robot = []
     with open(f"population/robot_{robot_idx}.txt", 'w') as file:
         file.write(all_lines[0])
         
         # Write springs information
-        for sublist in new_lines:
-            line = ' '.join(map(str, sublist)) + '\n'
+        for line in spring_lines:
             file.write(line)
-    
+            line = line.rstrip('\n').split()
+            
+            # Modify data to be store in the robot spring info field.
+            converted_parts = [int(line[0]), int(line[1]), float(line[2]), int(line[3])]
+            new_springs_robot.append(converted_parts)
+            
+    r.springs = new_springs_robot
     
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
@@ -703,7 +725,7 @@ def mutate_population(n_robot_population):
     
     for robot_idx in range(n_robot_population):
         mutation_choice = random.randint(0,2)
-
+    
         if mutation_choice == 0:
             # Add an object - Spring
             add_object(robot_idx)
