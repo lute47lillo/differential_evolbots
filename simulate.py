@@ -639,6 +639,8 @@ def add_object(robot_index):
             
         file.writelines(all_lines)
     
+def remove_object(robot_idx):
+    pass
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
 # The better the loss has increased steadily, the more chances of doing nothing.
@@ -646,23 +648,14 @@ def mutate_population(n_robot_population):
     
     for robot_idx in range(n_robot_population):
         mutation_choice = random.randint(0,2)
-        add_object(robot_idx)
         
-        # Add an object - Spring
         if mutation_choice == 0:
+            # Add an object - Spring
+            add_object(robot_idx)
             
-            # add_object(robot_idx)
-            pass
-        # Remove an object - Spring
         elif mutation_choice == 1:
-            
-            
-            pass
-      
-        else:
-            
-            # Do nothing
-            pass
+            # Remove an object - Spring
+            remove_object(robot_idx)
 
 
 # -------------------------------------------------------------
@@ -681,6 +674,8 @@ for simulation_step in range(simulation_total_steps):
         print(f"Working on robot {robot_idx+1}")
         
         # Get objects and springs individual robots
+        # TODO: Gather info from springs_population and Starting Population by reading file at every simulation run.
+        # TODO: Right now, it only gets the init created population.
         springs = springs_population[robot_idx]
         startingObjectPositions = startingObjectPositions_population[robot_idx]
             
