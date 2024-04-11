@@ -125,11 +125,16 @@ def simulate_robot(robot_index):
  
     # Write information of the robot morphology to text
     with open(f"population/robot_{robot_index}.txt", 'w') as file:
+        
+        # Write Object position
+        pos_line = str(startingObjectPositions) + '\n'
+        file.write(pos_line)
+        
+        # Write springs information
         for sublist in springs_robot:
             line = ' '.join(map(str, sublist)) + '\n'
             file.write(line)
-        # line = ' '.join(map(str, springs_robot)) + '\n'
-        # file.write(line)
+
  
     return springs_robot, startingObjectPositions
 
@@ -549,16 +554,124 @@ def eliminate_individual(n_robot_population):
         
 # -------------------------------------------------------------
 
-def mutate_population():
-    pass
+def get_last_obj_index(lines):
+    
+    # Gather all ith, jth
+    largest_idx = 0
+    for line in lines:
+        tokens = line.split()
+        
+        # Extract the second tokens as integers. Need to check what's largest index
+        if len(tokens) >= 2:
+            second = int(tokens[1])
+            
+            # Update to check what's the largest 
+            if second > largest_idx:
+                largest_idx = second
+    
+    return largest_idx
+
+# TODO: Use helper function on initial creation of population.
+def generate_obj_positions(n_objects):
+    
+    new_obj_pos = []
+    for _ in range(n_objects):
+        
+        # Generate random x_pos and y_pos
+        obj_x_pos = random.uniform(0, 0.4)
+        obj_y_pos = random.uniform(0, 0.4)
+        
+        # Check there is no object in same x and y.
+        for created_obj in new_obj_pos:
+            x, y = created_obj
+            # Add an arbitrary offset to undraw
+            if x == obj_x_pos and y == obj_y_pos:
+                obj_x_pos += 0.05
+                obj_y_pos += 0.05
+        
+        # Add object
+        new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
+        
+    return new_obj_pos
+
+def add_object(robot_index):
+    
+    # Create between 1 and 3 new objects
+    n_new_objects = random.randint(1, 3)
+    
+    # Read from file existing objects
+    with open(f"population/robot_{robot_index}.txt", 'r') as file:
+        
+        all_lines = file.readlines()
+        
+        # Get object positions
+        old_obj_pos = eval(all_lines[0])
+        
+        # Get the largest_idx to start adding objects
+        largest_idx = get_last_obj_index(all_lines[1:])
+        new_largest_idx = largest_idx + 1
+        
+        # Generate objects
+        new_obj_pos = generate_obj_positions(n_new_objects)
+        
+        # Combine old and new objects
+        total_obj_list = old_obj_pos + new_obj_pos
+        all_lines[0] = str(total_obj_list) + '\n'
+        
+        # Generate Springs. Randomly select if they are motorized or not.
+        # TODO: There should be a randomization, where not all objects are connected between springs (no matter if they are motor or not)
+        new_springs_robot = []
+        for i in range(len(total_obj_list)):
+            for j in range(new_largest_idx, len(total_obj_list)):
+                if i < j:
+                    is_motor = random.choice([0, 1])
+                    create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
+    
+    print(f"New springs: {new_springs_robot}")
+    
+    # Write the modified contents back to the file
+    with open(f"population/robot_{robot_index}.txt", 'w') as file:
+        
+        # Write springs information
+        for sublist in new_springs_robot:
+            line = ' '.join(map(str, sublist)) + '\n'
+            all_lines.append(line)
+            
+        file.writelines(all_lines)
+    
+
+# TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
+# The better the loss has increased steadily, the more chances of doing nothing.
+def mutate_population(n_robot_population):
+    
+    for robot_idx in range(n_robot_population):
+        mutation_choice = random.randint(0,2)
+        add_object(robot_idx)
+        
+        # Add an object - Spring
+        if mutation_choice == 0:
+            
+            # add_object(robot_idx)
+            pass
+        # Remove an object - Spring
+        elif mutation_choice == 1:
+            
+            
+            pass
+      
+        else:
+            
+            # Do nothing
+            pass
+
 
 # -------------------------------------------------------------
-
-# Create population of robots
-n_robot_population = 10
-simulation_total_steps = 2
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
+
+# Create population of robots
+n_robot_population = 2
+simulation_total_steps = 1
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(simulation_total_steps):
@@ -578,7 +691,7 @@ for simulation_step in range(simulation_total_steps):
         loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
         tai.root.lazy_grad()
         
-        for opt_step in range(4):        
+        for opt_step in range(1):        
             
             Initialize_Neural_Network()
             Initialize()
@@ -620,7 +733,7 @@ for simulation_step in range(simulation_total_steps):
     n_robot_population -= 1
             
     # Mutate remaining individuals
-    mutate_population()
+    mutate_population(n_robot_population)
     
 Draw(max_steps)
     
