@@ -95,7 +95,7 @@ def simulate_robot(robot_index):
     # First object is always given.
     startingObjectPositions.append([x_offset, ground_height])
     
-    # How many more are created?
+    # TODO: How many more are created? Should I start at least with 3 minimum?
     total_objects = random.randint(1, 5)
     
     # Generate objects
@@ -190,6 +190,7 @@ def calculate_center_robot(time_step: tai.i32):
 
 # -------------------------------------------------------------
 
+# TODO: Needs to use initial r.positions and r.springs in order to draw it properly.
 def Draw(frame_offset):
     
     for time_step in range(0, r.max_steps):
@@ -528,6 +529,11 @@ def save_fitness_loss(robot_index):
     with open(f"fitness/loss_{robot_index}.txt", 'w') as file:
         file.write(str(r.loss))
         
+def save_controller_weights(robot_index):
+    # Write information of the robot morphology to text
+    with open(f"controller/weights_{robot_index}.txt", 'w') as file:
+        pass
+        
 # -------------------------------------------------------------
 def eliminate_individual(n_robot_population):
     
@@ -661,8 +667,7 @@ def check_object_index(lines, object_index_remove):
 def remove_object(robot_idx, n_robot_population):
     
     # As simulation runs increase, number of possible objects to be removed increases as well.
-    initial_n_population = 2 # TODO: Move this as a global.
-    max_obj_remove = int(math.sqrt(initial_n_population - n_robot_population))
+    max_obj_remove = int(math.sqrt(initial_robot_population - n_robot_population))
 
     n_remove_objects = random.randint(1, max_obj_remove)
     
@@ -686,18 +691,16 @@ def remove_object(robot_idx, n_robot_population):
             
             else:
                 # Remove Obj position
-                object_index_remove = random.randint(1, len(r.startingObjectPositions)-1)     
-            
-                print(f"Object index to remove: {object_index_remove}")   
-                old_obj_pos.pop(object_index_remove)
+                object_index_remove = random.randint(1, len(r.startingObjectPositions)-1)   
                 
-                # Update objects
-                r.startingObjectPositions = old_obj_pos
+                if object_index_remove <= len(old_obj_pos):
+                    old_obj_pos.pop(object_index_remove)
                 
-                print(r.startingObjectPositions)
+                    # Update objects
+                    r.startingObjectPositions = old_obj_pos
                 
-                # Remove links containing that index
-                spring_lines = check_object_index(spring_lines, object_index_remove)
+                    # Remove links containing that index
+                    spring_lines = check_object_index(spring_lines, object_index_remove)
         
         # Rewrite
         all_lines[0] = str(old_obj_pos) + '\n'
@@ -733,37 +736,44 @@ def mutate_population(n_robot_population):
         elif mutation_choice == 1:
             # Remove an object - Spring
             remove_object(robot_idx, n_robot_population)
+            
+        springs_population[robot_idx] = r.springs
+        startingObjectPositions_population[robot_idx] = r.startingObjectPositions
+            
 
 # -------------------------------------------------------------
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
 
 # Create population of robots
-n_robot_population = 2
-simulation_total_steps = 1
+n_robot_population = 4
+initial_robot_population = n_robot_population
+# simulation_total_steps = 3
+n_optimization_steps = 3
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
-for simulation_step in range(simulation_total_steps):
+for simulation_step in range(initial_robot_population-1):
     
     robot_drawing = []
     for robot_idx in range(n_robot_population):
-        print(f"Working on robot {robot_idx+1}")
+        print(f"Working on robot {robot_idx}")
         
         # Get objects and springs individual robots
         # TODO: Gather info from springs_population and Starting Population by reading file at every simulation run.
         # TODO: Right now, it only gets the init created population.
+
         springs = springs_population[robot_idx]
         startingObjectPositions = startingObjectPositions_population[robot_idx]
-            
+ 
         r = Robot(springs, startingObjectPositions, max_steps)
-        # print(f"Initial: {r.startingObjectPositions}")
+        # print(f"Simulate step {simulation_step} - Robot {robot_idx} - springs {r.springs}")
         
         # TODO: There has to be a more efficient way to do this, than to have 2 different losses being calculated.
-        # Create loss of that robot
+        # Create loss for that robot
         loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
         tai.root.lazy_grad()
         
-        for opt_step in range(1):        
+        for opt_step in range(n_optimization_steps):        
             
             Initialize_Neural_Network()
             Initialize()
@@ -792,7 +802,10 @@ for simulation_step in range(simulation_total_steps):
                 Draw(0)
             
             # Save the fitness loss
-            save_fitness_loss(robot_idx)        
+            save_fitness_loss(robot_idx)     
+            
+            # TODO: Save optimized steps Across simulation runs. Right now, it re-starts the controller optimization for each run.
+            save_controller_weights(robot_idx)   
 
     # Eliminate the lowest-ranked individual by fitness
     eliminate_individual(n_robot_population)
