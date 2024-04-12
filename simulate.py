@@ -191,7 +191,7 @@ def calculate_center_robot(time_step: tai.i32):
 # -------------------------------------------------------------
 
 # TODO: Needs to use initial r.positions and r.springs in order to draw it properly.
-def Draw(frame_offset):
+def Draw(frame_offset, robot_index):
     
     for time_step in range(0, r.max_steps):
         # Draw the robot using Taichi's built-iGUI. (x,y) size of window
@@ -226,8 +226,10 @@ def Draw(frame_offset):
             else:
                 tai_gui.line(begin=position_a, end=position_b, color=0x0, radius=1)
 
-                
-        tai_gui.show(f"images/test_{frame_offset+time_step}.png")
+        if not os.path.exists(f"images/robot_{robot_index}"):
+            os.makedirs(f"images/robot_{robot_index}")  
+               
+        tai_gui.show(f"images/robot_{robot_index}/image_{frame_offset+time_step}.png")
 
 # -------------------------------------------------------------
 
@@ -498,7 +500,7 @@ def tune_robots_brain():
 # Create Video
 def Create_video():
     os.system("rm movie.p4")
-    os.system(" ffmpeg -i images/test_%d.png movie.mp4")
+    os.system(" ffmpeg -i images/robot_0/image_%d.png movie.mp4")
 
 # -------------------------------------------------------------
 
@@ -521,6 +523,18 @@ def re_order_files(directory, attr):
         if filename != new_filename:
             os.rename(old_path, new_path)
             print(f"Renamed '{filename}' to '{new_filename}'")
+            
+def rename_dir(root_directory):
+    for subdir in os.listdir(root_directory):
+        
+        # Check if the entry is a directory
+        if os.path.isdir(os.path.join(root_directory, subdir)):
+            # Split the directory name by '_' to get the prefix and the number
+            prefix, _ = subdir.split('_')
+            # Rename the directory to 'prefix_0'
+            new_name = f"{prefix}_0"
+            os.rename(os.path.join(root_directory, subdir), os.path.join(root_directory, new_name))
+            print(f"Renamed directory '{subdir}' to '{new_name}'.")
 
 # -------------------------------------------------------------
 
@@ -530,10 +544,27 @@ def save_fitness_loss(robot_index):
         file.write(str(r.loss))
         
 def save_controller_weights(robot_index):
+    
     # Write information of the robot morphology to text
-    with open(f"controller/weights_{robot_index}.txt", 'w') as file:
-        pass
+    weightsSH_arr = r.weightsSH.to_numpy()
+    weightsHM_arr = r.weightsHM.to_numpy()
+    hidden_arr = r.hidden.to_numpy()
+    bias_hidden_arr = r.bias_hidden.to_numpy()
+    
+    np.savez(f'controller/weights_{robot_index}.npz', weightsSH=weightsSH_arr, weightsHM=weightsHM_arr,
+             hidden=hidden_arr, bias_hidden=bias_hidden_arr)
         
+def load_controller_weights(robot_index):
+    
+    # Load the arrays from the .npz file
+    data = np.load(f'controller/weights_{robot_index}.npz')
+
+    # Access individual arrays by their keys
+    r.weightsSH.from_numpy(data["weightsSH"])
+    r.weightsHM.from_numpy(data["weightsHM"])
+    r.hidden.from_numpy(data["hidden"])
+    r.bias_hidden.from_numpy(data["bias_hidden"])
+    
 # -------------------------------------------------------------
 def eliminate_individual(n_robot_population):
     
@@ -553,9 +584,10 @@ def eliminate_individual(n_robot_population):
                 temp_lowest = float(temp_loss)
                 print(f"New Highest: {idx_robot_delete} -> {temp_lowest}")
     
-    # Delete population and fitness files
+    # Delete population, fitness and image files
     os.system(f"rm population/robot_{idx_robot_delete}.txt")
     os.system(f"rm fitness/loss_{idx_robot_delete}.txt")
+    os.system(f"rm -rf images/robot_{idx_robot_delete}")
         
 # -------------------------------------------------------------
 
@@ -623,6 +655,7 @@ def add_object(robot_index):
         total_obj_list = old_obj_pos + new_obj_pos
         all_lines[0] = str(total_obj_list) + '\n'
         r.startingObjectPositions = total_obj_list
+        r.n_objects = len(r.startingObjectPositions)
         
         # Generate Springs. Randomly select if they are motorized or not.
         # TODO: There should be a randomization, where not all objects are connected between springs (no matter if they are motor or not)
@@ -633,8 +666,7 @@ def add_object(robot_index):
                     is_motor = random.choice([0, 1])
                     create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
         r.springs = new_springs_robot
-    
-    # print(f"New springs: {new_springs_robot}")
+        r.n_springs = len(r.springs)
     
     # Write the modified contents back to the file
     with open(f"population/robot_{robot_index}.txt", 'w') as file:
@@ -704,6 +736,7 @@ def remove_object(robot_idx, n_robot_population):
         
         # Rewrite
         all_lines[0] = str(old_obj_pos) + '\n'
+        r.n_objects = len(r.startingObjectPositions)
         
     # Write the modified contents back to the file. 
     new_springs_robot = []
@@ -720,6 +753,7 @@ def remove_object(robot_idx, n_robot_population):
             new_springs_robot.append(converted_parts)
             
     r.springs = new_springs_robot
+    r.n_springs = len(r.springs)
     
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
@@ -744,12 +778,12 @@ def mutate_population(n_robot_population):
 # -------------------------------------------------------------
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
+os.system("rm controller/*.npz")
 
 # Create population of robots
-n_robot_population = 4
+n_robot_population = 10
 initial_robot_population = n_robot_population
-# simulation_total_steps = 3
-n_optimization_steps = 3
+n_optimization_steps = 5
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(initial_robot_population-1):
@@ -775,7 +809,11 @@ for simulation_step in range(initial_robot_population-1):
         
         for opt_step in range(n_optimization_steps):        
             
-            Initialize_Neural_Network()
+            if opt_step == 0:
+                Initialize_Neural_Network()
+            else:
+                load_controller_weights(robot_idx)
+                
             Initialize()
             
             with tai.Tape(loss):
@@ -798,14 +836,14 @@ for simulation_step in range(initial_robot_population-1):
             # TODO: As of now, we might just draw the final optimization.
             # Draw First Optimization Step
             if opt_step == 0:
-                os.system("rm images/*.png")
-                Draw(0)
+                os.system(f"rm images/robot_{robot_idx}/*.png")
+                Draw(0, robot_idx)
             
             # Save the fitness loss
             save_fitness_loss(robot_idx)     
             
             # TODO: Save optimized steps Across simulation runs. Right now, it re-starts the controller optimization for each run.
-            save_controller_weights(robot_idx)   
+            save_controller_weights(robot_idx)  
 
     # Eliminate the lowest-ranked individual by fitness
     eliminate_individual(n_robot_population)
@@ -813,6 +851,7 @@ for simulation_step in range(initial_robot_population-1):
     # Re-order file indices for simplicity
     re_order_files("population", "robot")
     re_order_files("fitness", "loss")
+    rename_dir("images")
             
     # Set new number of individuals in population
     n_robot_population -= 1
@@ -820,7 +859,8 @@ for simulation_step in range(initial_robot_population-1):
     # Mutate remaining individuals
     mutate_population(n_robot_population)
     
-Draw(max_steps)
+# TODO: Fix draw problem. It should create 2 movies, inital video and final video
+Draw(max_steps, 0)
     
 # Create the video
 Create_video()
