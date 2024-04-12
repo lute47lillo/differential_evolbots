@@ -193,7 +193,7 @@ def calculate_center_robot(time_step: tai.i32):
 
 # TODO: Needs to use initial r.positions and r.springs in order to draw it properly.
 def Draw(frame_offset, robot_index):
-    
+        
     for time_step in range(0, r.max_steps):
         # Draw the robot using Taichi's built-iGUI. (x,y) size of window
         tai_gui = tai.GUI("Robot", (512, 512),
@@ -648,7 +648,11 @@ def add_object(robot_index, is_spring_null):
     print(f"MUTATION: Adding Objects to robot {robot_index}")
     
     # Create between 1 and 3 new objects
-    n_new_objects = random.randint(1, 3)
+    # Check of Mutation being to harsh on robots.
+    if is_spring_null:
+        n_new_objects = 2
+    else:
+        n_new_objects = random.randint(1, 3)
     
     # Read from file existing objects
     with open(f"population/robot_{robot_index}.txt", 'r') as file:
@@ -760,11 +764,12 @@ def remove_object(robot_idx, n_robot_population):
                     # Remove links containing that index
                     spring_lines = check_object_index(spring_lines, object_index_remove)
                     
+                    
                     if len(spring_lines) == 0:
-                        print(f"Deleting all springs...need to add obj to {robot_idx}")
+                        print(f"WARNING: Deleting all springs... Add obj to robot {robot_idx}")
                         add_object(robot_idx, True)
-                        spring_lines = check_object_index(spring_lines, object_index_remove)
-        
+                        spring_lines = check_object_index(spring_lines, object_index_remove) 
+                   
         # Rewrite
         all_lines[0] = str(old_obj_pos) + '\n'
         r.n_objects = len(r.startingObjectPositions)
@@ -910,7 +915,8 @@ print(f"\nEND SIMULATION")
 # rename_dir("images")
 
 # TODO: You might need to instantiate the robot to be able to draw it
-r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
+# Draw final robot.
+# r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
 Draw(max_steps, 0)
     
 # Create the video
