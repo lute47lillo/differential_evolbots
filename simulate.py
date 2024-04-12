@@ -527,10 +527,25 @@ def re_order_files(directory, attr):
 def rename_dir(root_directory):
     for subdir in os.listdir(root_directory):
         
+        # # Loop through the files and rename them
+        # for idx, dirname in enumerate(subdir):
+        #     old_path = os.path.join(root_directory, dirname)
+        #     new_dirname = f"{attr}_{idx}.txt"
+        #     new_path = os.path.join(root_directory, new_dirname)
+            
+        # if dirname != new_dirname:
+        #     os.rename(old_path, new_path)
+        #     print(f"Renamed '{dirname}' to '{new_dirname}'")
+        
         # Check if the entry is a directory
         if os.path.isdir(os.path.join(root_directory, subdir)):
             # Split the directory name by '_' to get the prefix and the number
-            prefix, _ = subdir.split('_')
+            prefix, number = subdir.split('_')
+            
+            # Base Case where robot_0 is fittest
+            if number == 0:
+                return
+            
             # Rename the directory to 'prefix_0'
             new_name = f"{prefix}_0"
             os.rename(os.path.join(root_directory, subdir), os.path.join(root_directory, new_name))
@@ -583,6 +598,8 @@ def eliminate_individual(n_robot_population):
                 idx_robot_delete = robot_index
                 temp_lowest = float(temp_loss)
                 print(f"New Highest: {idx_robot_delete} -> {temp_lowest}")
+    
+    print(f"Eliminating robot {idx_robot_delete}\n")
     
     # Delete population, fitness and image files
     os.system(f"rm population/robot_{idx_robot_delete}.txt")
@@ -715,7 +732,7 @@ def remove_object(robot_idx, n_robot_population):
         for _ in range(n_remove_objects):
             
             # Check that there are more than 2 objects
-            if original_obj_size == 2:
+            if original_obj_size <= 2:
                 
                 # Mutate by adding object
                 add_object(robot_idx)
@@ -723,10 +740,12 @@ def remove_object(robot_idx, n_robot_population):
             
             else:
                 # Remove Obj position
-                object_index_remove = random.randint(1, len(r.startingObjectPositions)-1)   
+                object_index_remove = random.randint(1, len(old_obj_pos)-1)   
                 
                 if object_index_remove <= len(old_obj_pos):
+                    print(f"Before old obj pos: {old_obj_pos}")
                     old_obj_pos.pop(object_index_remove)
+                    print(f"After old obj pos: {old_obj_pos}")
                 
                     # Update objects
                     r.startingObjectPositions = old_obj_pos
@@ -779,18 +798,20 @@ def mutate_population(n_robot_population):
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
 os.system("rm controller/*.npz")
+os.system("rm -rf images/*")
 
 # Create population of robots
-n_robot_population = 10
+n_robot_population = 4
 initial_robot_population = n_robot_population
-n_optimization_steps = 5
+n_optimization_steps = 4
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(initial_robot_population-1):
     
+    print(f"\nSIMULATION RUN {simulation_step+1}")
     robot_drawing = []
     for robot_idx in range(n_robot_population):
-        print(f"Working on robot {robot_idx}")
+        print(f"\nWorking on robot {robot_idx}")
         
         # Get objects and springs individual robots
         # TODO: Gather info from springs_population and Starting Population by reading file at every simulation run.
@@ -827,7 +848,7 @@ for simulation_step in range(initial_robot_population-1):
             if loss[None] < r.loss[None]:
                 r.loss[None] = float(loss[None])
                 
-            print(f"Robot {robot_idx+1} - Opt Step {opt_step+1}. Loss: {loss[None]}")
+            print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
             
             # Fine-tune the brain of the robot
             tune_robots_brain()
@@ -835,7 +856,7 @@ for simulation_step in range(initial_robot_population-1):
             # TODO: It does not need to draw the first optimization step for all, but will need to save the values. 
             # TODO: As of now, we might just draw the final optimization.
             # Draw First Optimization Step
-            if opt_step == 0:
+            if opt_step == 0 and simulation_step == 0:
                 os.system(f"rm images/robot_{robot_idx}/*.png")
                 Draw(0, robot_idx)
             
@@ -851,15 +872,17 @@ for simulation_step in range(initial_robot_population-1):
     # Re-order file indices for simplicity
     re_order_files("population", "robot")
     re_order_files("fitness", "loss")
-    rename_dir("images")
             
     # Set new number of individuals in population
     n_robot_population -= 1
-            
-    # Mutate remaining individuals
-    mutate_population(n_robot_population)
     
+    if n_robot_population != 1:
+        # Mutate remaining individuals
+        mutate_population(n_robot_population)
+    
+print(f"\nEND SIMULATION")
 # TODO: Fix draw problem. It should create 2 movies, inital video and final video
+rename_dir("images")
 Draw(max_steps, 0)
     
 # Create the video
