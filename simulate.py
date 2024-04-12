@@ -6,6 +6,7 @@ import numpy as np
 import math
 import random
 from robot import Robot
+import shutil
 
 # -------------------------------------------------------------
 # move the object to max use the taichi's differentiable routine.
@@ -524,32 +525,24 @@ def re_order_files(directory, attr):
             os.rename(old_path, new_path)
             print(f"Renamed '{filename}' to '{new_filename}'")
             
-def rename_dir(root_directory):
-    for subdir in os.listdir(root_directory):
+def rename_dir(directory):
+    
+    # Get the list of files in the directory
+    dirs = os.listdir(directory)
+    
+    # Sort the files by their index in ascending order
+    dirs.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+    
+    # Loop through the files and rename them
+    for idx, dir_name in enumerate(dirs):
+        old_path = directory + "/" + dir_name
+        new_dir_ename = f"robot_{idx}"
+        new_path = directory + "/" + new_dir_ename
         
-        # # Loop through the files and rename them
-        # for idx, dirname in enumerate(subdir):
-        #     old_path = os.path.join(root_directory, dirname)
-        #     new_dirname = f"{attr}_{idx}.txt"
-        #     new_path = os.path.join(root_directory, new_dirname)
-            
-        # if dirname != new_dirname:
-        #     os.rename(old_path, new_path)
-        #     print(f"Renamed '{dirname}' to '{new_dirname}'")
-        
-        # Check if the entry is a directory
-        if os.path.isdir(os.path.join(root_directory, subdir)):
-            # Split the directory name by '_' to get the prefix and the number
-            prefix, number = subdir.split('_')
-            
-            # Base Case where robot_0 is fittest
-            if number == 0:
-                return
-            
-            # Rename the directory to 'prefix_0'
-            new_name = f"{prefix}_0"
-            os.rename(os.path.join(root_directory, subdir), os.path.join(root_directory, new_name))
-            print(f"Renamed directory '{subdir}' to '{new_name}'.")
+        # Rename the file only if its name is different from the new name
+        if dir_name != new_dir_ename:
+            os.rename(old_path, new_path)
+            print(f"Renamed '{dir_name}' to '{new_dir_ename}'")
 
 # -------------------------------------------------------------
 
@@ -597,14 +590,16 @@ def eliminate_individual(n_robot_population):
                 # Save index of file to be deleted.
                 idx_robot_delete = robot_index
                 temp_lowest = float(temp_loss)
-                print(f"New Highest: {idx_robot_delete} -> {temp_lowest}")
+                print(f"\nNew Worst fitness robot {idx_robot_delete} -> {temp_lowest}")
     
     print(f"Eliminating robot {idx_robot_delete}\n")
     
     # Delete population, fitness and image files
     os.system(f"rm population/robot_{idx_robot_delete}.txt")
     os.system(f"rm fitness/loss_{idx_robot_delete}.txt")
-    os.system(f"rm -rf images/robot_{idx_robot_delete}")
+    shutil.rmtree(f"images/robot_{idx_robot_delete}/")
+    
+    return idx_robot_delete
         
 # -------------------------------------------------------------
 
@@ -648,7 +643,9 @@ def generate_obj_positions(n_objects):
         
     return new_obj_pos
 
-def add_object(robot_index):
+def add_object(robot_index, is_spring_null):
+    
+    print(f"MUTATION: Adding Objects to robot {robot_index}")
     
     # Create between 1 and 3 new objects
     n_new_objects = random.randint(1, 3)
@@ -680,7 +677,13 @@ def add_object(robot_index):
         for i in range(len(total_obj_list)):
             for j in range(new_largest_idx, len(total_obj_list)):
                 if i < j:
-                    is_motor = random.choice([0, 1])
+                    
+                    # Check of Mutation being to harsh on robots.
+                    if is_spring_null:
+                        is_motor = 1
+                    else:
+                        is_motor = random.choice([0, 1])
+                        
                     create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
         r.springs = new_springs_robot
         r.n_springs = len(r.springs)
@@ -717,8 +720,12 @@ def remove_object(robot_idx, n_robot_population):
     
     # As simulation runs increase, number of possible objects to be removed increases as well.
     max_obj_remove = int(math.sqrt(initial_robot_population - n_robot_population))
-
     n_remove_objects = random.randint(1, max_obj_remove)
+    
+    # Check that there is at least 1 spring at all moments
+    if r.n_springs <= 1:
+        add_object(robot_idx, True)
+        return
     
     with open(f"population/robot_{robot_idx}.txt", 'r') as file:
         
@@ -730,12 +737,12 @@ def remove_object(robot_idx, n_robot_population):
         old_obj_pos = eval(all_lines[0])
         spring_lines = all_lines[1:]
         for _ in range(n_remove_objects):
-            
+
             # Check that there are more than 2 objects
             if original_obj_size <= 2:
                 
                 # Mutate by adding object
-                add_object(robot_idx)
+                add_object(robot_idx, True)
                 return
             
             else:
@@ -743,15 +750,20 @@ def remove_object(robot_idx, n_robot_population):
                 object_index_remove = random.randint(1, len(old_obj_pos)-1)   
                 
                 if object_index_remove <= len(old_obj_pos):
-                    print(f"Before old obj pos: {old_obj_pos}")
+                    
+                    print(f"MUTATION: Removing Objects to robot {robot_idx}")
                     old_obj_pos.pop(object_index_remove)
-                    print(f"After old obj pos: {old_obj_pos}")
                 
                     # Update objects
                     r.startingObjectPositions = old_obj_pos
                 
                     # Remove links containing that index
                     spring_lines = check_object_index(spring_lines, object_index_remove)
+                    
+                    if len(spring_lines) == 0:
+                        print(f"Deleting all springs...need to add obj to {robot_idx}")
+                        add_object(robot_idx, True)
+                        spring_lines = check_object_index(spring_lines, object_index_remove)
         
         # Rewrite
         all_lines[0] = str(old_obj_pos) + '\n'
@@ -772,6 +784,7 @@ def remove_object(robot_idx, n_robot_population):
             new_springs_robot.append(converted_parts)
             
     r.springs = new_springs_robot
+    print(f"\nAfter removing, there are {len(r.springs)} - robot {robot_idx}")
     r.n_springs = len(r.springs)
     
 
@@ -784,7 +797,7 @@ def mutate_population(n_robot_population):
     
         if mutation_choice == 0:
             # Add an object - Spring
-            add_object(robot_idx)
+            add_object(robot_idx, False)
    
         elif mutation_choice == 1:
             # Remove an object - Spring
@@ -801,9 +814,9 @@ os.system("rm controller/*.npz")
 os.system("rm -rf images/*")
 
 # Create population of robots
-n_robot_population = 4
+n_robot_population = 6
 initial_robot_population = n_robot_population
-n_optimization_steps = 4
+n_optimization_steps = 10 
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(initial_robot_population-1):
@@ -817,17 +830,19 @@ for simulation_step in range(initial_robot_population-1):
         # TODO: Gather info from springs_population and Starting Population by reading file at every simulation run.
         # TODO: Right now, it only gets the init created population.
 
+        # TODO: if the robot_idx get reset to start from 0..curr_n_pop. Then springs_population should too be resized
         springs = springs_population[robot_idx]
         startingObjectPositions = startingObjectPositions_population[robot_idx]
- 
+
         r = Robot(springs, startingObjectPositions, max_steps)
-        # print(f"Simulate step {simulation_step} - Robot {robot_idx} - springs {r.springs}")
         
         # TODO: There has to be a more efficient way to do this, than to have 2 different losses being calculated.
         # Create loss for that robot
         loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
         tai.root.lazy_grad()
         
+        
+        # TODO: For each optimization step, there should only be an update of controllers when it is better, not at last
         for opt_step in range(n_optimization_steps):        
             
             if opt_step == 0:
@@ -845,8 +860,12 @@ for simulation_step in range(initial_robot_population-1):
                 
                 Compute_loss()
             
+            # TODO: Find the solution to some robots having nan loss
             if loss[None] < r.loss[None]:
-                r.loss[None] = float(loss[None])
+                if np.isnan(loss[None]):
+                    r.loss[None] = 100000
+                else:
+                    r.loss[None] = float(loss[None])
                 
             print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
             
@@ -867,22 +886,31 @@ for simulation_step in range(initial_robot_population-1):
             save_controller_weights(robot_idx)  
 
     # Eliminate the lowest-ranked individual by fitness
-    eliminate_individual(n_robot_population)
+    idx_robot_delete = eliminate_individual(n_robot_population)
     
     # Re-order file indices for simplicity
     re_order_files("population", "robot")
     re_order_files("fitness", "loss")
+    rename_dir("images")
             
     # Set new number of individuals in population
     n_robot_population -= 1
     
+    # Delete from list of springs and objects
+    springs_population.pop(idx_robot_delete)
+    startingObjectPositions_population.pop(idx_robot_delete)
+         
     if n_robot_population != 1:
         # Mutate remaining individuals
         mutate_population(n_robot_population)
     
 print(f"\nEND SIMULATION")
+
 # TODO: Fix draw problem. It should create 2 movies, inital video and final video
-rename_dir("images")
+# rename_dir("images")
+
+# TODO: You might need to instantiate the robot to be able to draw it
+r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
 Draw(max_steps, 0)
     
 # Create the video
