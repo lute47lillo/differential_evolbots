@@ -16,13 +16,13 @@ import shutil
     GLOBAL VARIABLES
 """
 max_steps = 200
-ground_height = 0.05
+ground_height = 0.075
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.8
 learning_rate = 1
 x_offset = 0.1 # How far from left screen robot starts
-damping = 0.6 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.65 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
 
@@ -33,6 +33,32 @@ n_sin_waves = 10
 
 def n_sensors(n_objects):
     return n_sin_waves + 4 * n_objects + 2
+
+# -----------------------------------------------------------------
+
+# TODO: Use helper function on initial creation of population.
+def generate_obj_positions(n_objects):
+    
+    new_obj_pos = []
+    for _ in range(n_objects):
+        
+        # Generate random x_pos and y_pos
+        obj_x_pos = random.uniform(0, 0.3)
+        obj_y_pos = random.uniform(0, 0.3)
+        
+        # Check there is no object in same x and y.
+        for created_obj in new_obj_pos:
+            x, y = created_obj
+            
+            # Add an arbitrary offset to undraw
+            if x == obj_x_pos and y == obj_y_pos:
+                obj_x_pos += 0.05
+                obj_y_pos += 0.05
+        
+        # Add object
+        new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
+        
+    return new_obj_pos
 
 # -----------------------------------------------------------------
 
@@ -72,7 +98,6 @@ def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
 
 # -----------------------------------------------------------------
 
-# TODO: Delete the files of population/ to be from sracth on every new run.
 def simulate_robot(robot_index):
     """
         Definition
@@ -99,23 +124,8 @@ def simulate_robot(robot_index):
     # TODO: How many more are created? Should I start at least with 3 minimum?
     total_objects = random.randint(1, 5)
     
-    # Generate objects
-    for _ in range(total_objects):
-        
-        # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0, 0.4)
-        obj_y_pos = random.uniform(0, 0.4)
-        
-        # Check there is no object in same x and y.
-        for created_obj in startingObjectPositions:
-            x, y = created_obj
-            # Add an arbitrary offset to undraw
-            if x == obj_x_pos and y == obj_y_pos:
-                obj_x_pos += 0.05
-                obj_y_pos += 0.05
-        
-        # Add object
-        startingObjectPositions.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
+    # Generate the objects
+    startingObjectPositions += generate_obj_positions(total_objects)
         
     # Generate Springs. Randomly select if they are motorized or not.
     for i in range(len(startingObjectPositions)):
@@ -135,7 +145,6 @@ def simulate_robot(robot_index):
             line = ' '.join(map(str, sublist)) + '\n'
             file.write(line)
 
- 
     return springs_robot, startingObjectPositions
 
 # -----------------------------------------------------------------
@@ -211,7 +220,10 @@ def Draw(frame_offset, robot_index):
             y = r.positions[time_step, object_idx][1]
             tai_gui.circle((x,y), color=0x0, radius=7)
             
-        # Draw the springs
+        # TODO: I think the last springs are not getting updated. Draw the springs
+        if frame_offset == 200:
+            print(f"Final robot springs: {r.springs}")
+            
         for spring_idx in range(r.n_springs):
             object_a_index = r.spring_anchor_a[spring_idx]
             object_b_index = r.spring_anchor_b[spring_idx]
@@ -251,6 +263,7 @@ def Initialize():
         
     # spring_anchor_a, spring_anchor_b = spring_anchors
     for spring_idx in range(r.n_springs):
+        print(r.springs)
         s = r.springs[spring_idx] # Get spring
         r.spring_anchor_a[spring_idx]         = s[0] # the a object of that spring
         r.spring_anchor_b[spring_idx]         = s[1]
@@ -399,7 +412,7 @@ def simulate_springs(time_step: tai.i32):
         # spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * tai.sin(0.9*time_step)
         
         # Newer version takes the motorized action form the NN. Keep value small
-        spring_resting_length = spring_resting_length + 0.07 * r.spring_actuation[spring_idx] *r. actuation[time_step, spring_idx]
+        spring_resting_length = spring_resting_length + 0.07 * r.spring_actuation[spring_idx] * r.actuation[time_step, spring_idx]
         
         # Difference between current and supposed initial at that index
         spring_difference = curr_rest_length - spring_resting_length
@@ -607,8 +620,19 @@ def get_last_obj_index(lines):
     
     # Gather all ith, jth
     largest_idx = 0
+    current_springs = []
     for line in lines:
+
         tokens = line.split()
+        
+        # Get current springs to update after adding object
+        indiv_spring = []
+        for i, num in enumerate(tokens):
+            if i == 2:  # Check if it's the third number (0-indexed)
+                indiv_spring.append(float(num))
+            else:
+                indiv_spring.append(int(num))
+        current_springs.append(indiv_spring)
         
         # Extract the second tokens as integers. Need to check what's largest index
         if len(tokens) >= 2:
@@ -618,30 +642,7 @@ def get_last_obj_index(lines):
             if second > largest_idx:
                 largest_idx = second
     
-    return largest_idx
-
-# TODO: Use helper function on initial creation of population.
-def generate_obj_positions(n_objects):
-    
-    new_obj_pos = []
-    for _ in range(n_objects):
-        
-        # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0, 0.4)
-        obj_y_pos = random.uniform(0, 0.4)
-        
-        # Check there is no object in same x and y.
-        for created_obj in new_obj_pos:
-            x, y = created_obj
-            # Add an arbitrary offset to undraw
-            if x == obj_x_pos and y == obj_y_pos:
-                obj_x_pos += 0.05
-                obj_y_pos += 0.05
-        
-        # Add object
-        new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
-        
-    return new_obj_pos
+    return largest_idx, current_springs
 
 def add_object(robot_index, is_spring_null):
     
@@ -663,7 +664,7 @@ def add_object(robot_index, is_spring_null):
         old_obj_pos = eval(all_lines[0])
         
         # Get the largest_idx to start adding objects
-        largest_idx = get_last_obj_index(all_lines[1:])
+        largest_idx, current_springs = get_last_obj_index(all_lines[1:])
         new_largest_idx = largest_idx + 1
         
         # Generate objects
@@ -671,8 +672,8 @@ def add_object(robot_index, is_spring_null):
         
         # Combine old and new objects
         total_obj_list = old_obj_pos + new_obj_pos
-        all_lines[0] = str(total_obj_list) + '\n'
         r.startingObjectPositions = total_obj_list
+        all_lines[0] = str(r.startingObjectPositions) + '\n'
         r.n_objects = len(r.startingObjectPositions)
         
         # Generate Springs. Randomly select if they are motorized or not.
@@ -681,15 +682,13 @@ def add_object(robot_index, is_spring_null):
         for i in range(len(total_obj_list)):
             for j in range(new_largest_idx, len(total_obj_list)):
                 if i < j:
-                    
-                    # Check of Mutation being to harsh on robots.
-                    if is_spring_null:
-                        is_motor = 1
-                    else:
-                        is_motor = random.choice([0, 1])
-                        
+                    is_motor = random.choice([0, 1])    
                     create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
-        r.springs = new_springs_robot
+        
+        # TODO: Current springs are not given as 
+        total_new_springs = current_springs + new_springs_robot
+        r.springs = total_new_springs
+        print(f"After adding: {r.springs}")
         r.n_springs = len(r.springs)
     
     # Write the modified contents back to the file
@@ -722,9 +721,11 @@ def check_object_index(lines, object_index_remove):
 
 def remove_object(robot_idx, n_robot_population):
     
-    # As simulation runs increase, number of possible objects to be removed increases as well.
-    max_obj_remove = int(math.sqrt(initial_robot_population - n_robot_population))
-    n_remove_objects = random.randint(1, max_obj_remove)
+    # TODO: As simulation runs increase, number of possible objects to be removed increases as well.
+    # TODO: This might be to penalizing.
+    # max_obj_remove = int(math.sqrt(initial_robot_population - n_robot_population))
+    # n_remove_objects = random.randint(1, max_obj_remove)
+    n_remove_objects = 1
     
     # Check that there is at least 1 spring at all moments
     if r.n_springs <= 1:
@@ -737,41 +738,52 @@ def remove_object(robot_idx, n_robot_population):
         all_lines = file.readlines()
         
         # Get object positions
-        original_obj_size = len(r.startingObjectPositions)
         old_obj_pos = eval(all_lines[0])
+        r.startingObjectPositions = old_obj_pos
+        original_obj_size = len(r.startingObjectPositions)
+        
+        # Check that there are more than 2 objects
+        if original_obj_size <= 2:
+            
+            # Mutate by adding object
+            add_object(robot_idx, True)
+            return
+        
+        # Get springs from file
         spring_lines = all_lines[1:]
+        
         for _ in range(n_remove_objects):
 
-            # Check that there are more than 2 objects
-            if original_obj_size <= 2:
-                
-                # Mutate by adding object
-                add_object(robot_idx, True)
-                return
+            # Remove Obj position
+            object_index_remove = random.randint(1, len(r.startingObjectPositions)-1)   
             
-            else:
-                # Remove Obj position
-                object_index_remove = random.randint(1, len(old_obj_pos)-1)   
+            if object_index_remove <= len(r.startingObjectPositions):
                 
-                if object_index_remove <= len(old_obj_pos):
-                    
-                    print(f"MUTATION: Removing Objects to robot {robot_idx}")
-                    old_obj_pos.pop(object_index_remove)
+                print(f"MUTATION: Removing Objects to robot {robot_idx}")
                 
-                    # Update objects
-                    r.startingObjectPositions = old_obj_pos
+                print(f"Before {r.startingObjectPositions}")
+                r.startingObjectPositions.pop(object_index_remove)
+                print(f"After {r.startingObjectPositions}")
+            
+                # Remove links containing that index
+                spring_lines = check_object_index(spring_lines, object_index_remove)
                 
-                    # Remove links containing that index
-                    spring_lines = check_object_index(spring_lines, object_index_remove)
-                    
-                    
-                    if len(spring_lines) == 0:
-                        print(f"WARNING: Deleting all springs... Add obj to robot {robot_idx}")
-                        add_object(robot_idx, True)
-                        spring_lines = check_object_index(spring_lines, object_index_remove) 
+            # Check there is still a robot spring
+            if len(spring_lines) == 0:
+                print(f"WARNING: Deleting all springs... Add Object to robot {robot_idx}")
+                add_object(robot_idx, True)
+                
+                # Need to re-set spring lines
+                temp_spring_lines = file.readlines()
+                spring_lines = temp_spring_lines[1:]
+                
+                # Re-set objects
+                old_obj_pos = eval(all_lines[0])
+                r.startingObjectPositions = old_obj_pos
+                print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
                    
         # Rewrite
-        all_lines[0] = str(old_obj_pos) + '\n'
+        all_lines[0] = str(r.startingObjectPositions) + '\n'
         r.n_objects = len(r.startingObjectPositions)
         
     # Write the modified contents back to the file. 
@@ -789,12 +801,12 @@ def remove_object(robot_idx, n_robot_population):
             new_springs_robot.append(converted_parts)
             
     r.springs = new_springs_robot
-    print(f"\nAfter removing, there are {len(r.springs)} - robot {robot_idx}")
     r.n_springs = len(r.springs)
+    print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
     
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
-# The better the loss has increased steadily, the more chances of doing nothing.
+# TODO: The better the loss has increased steadily, the more chances of doing nothing. The worse it has perform, the more it needs to mutate.
 def mutate_population(n_robot_population):
     
     for robot_idx in range(n_robot_population):
@@ -819,10 +831,15 @@ os.system("rm controller/*.npz")
 os.system("rm -rf images/*")
 
 # Create population of robots
-n_robot_population = 6
+n_robot_population = 5
 initial_robot_population = n_robot_population
-n_optimization_steps = 10 
+n_optimization_steps = 2
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
+
+for idx, st in enumerate(startingObjectPositions_population):
+    print(f"Robot {idx} -> {st}")
+
+
 
 for simulation_step in range(initial_robot_population-1):
     
@@ -845,7 +862,6 @@ for simulation_step in range(initial_robot_population-1):
         # Create loss for that robot
         loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) # 0-D tensor
         tai.root.lazy_grad()
-        
         
         # TODO: For each optimization step, there should only be an update of controllers when it is better, not at last
         for opt_step in range(n_optimization_steps):        
@@ -872,7 +888,7 @@ for simulation_step in range(initial_robot_population-1):
                 else:
                     r.loss[None] = float(loss[None])
                 
-            print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
+            # print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
             
             # Fine-tune the brain of the robot
             tune_robots_brain()
@@ -914,8 +930,10 @@ print(f"\nEND SIMULATION")
 # TODO: Fix draw problem. It should create 2 movies, inital video and final video
 # rename_dir("images")
 
-# TODO: You might need to instantiate the robot to be able to draw it
+# TODO: You might need to instantiate the robot to be able to draw it. NOT USING ACTUAL FINAL ROBOT.
 # Draw final robot.
+
+print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
 # r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
 Draw(max_steps, 0)
     
