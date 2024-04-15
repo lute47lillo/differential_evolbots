@@ -688,7 +688,6 @@ def add_object(robot_index, is_spring_null):
         # TODO: Current springs are not given as 
         total_new_springs = current_springs + new_springs_robot
         r.springs = total_new_springs
-        print(f"After adding: {r.springs}")
         r.n_springs = len(r.springs)
     
     # Write the modified contents back to the file
@@ -722,7 +721,6 @@ def check_object_index(lines, object_index_remove):
 def remove_object(robot_idx, n_robot_population):
     
     # TODO: As simulation runs increase, number of possible objects to be removed increases as well.
-    # TODO: This might be to penalizing.
     # max_obj_remove = int(math.sqrt(initial_robot_population - n_robot_population))
     # n_remove_objects = random.randint(1, max_obj_remove)
     n_remove_objects = 1
@@ -761,9 +759,8 @@ def remove_object(robot_idx, n_robot_population):
                 
                 print(f"MUTATION: Removing Objects to robot {robot_idx}")
                 
-                print(f"Before {r.startingObjectPositions}")
+                # Remove Objects
                 r.startingObjectPositions.pop(object_index_remove)
-                print(f"After {r.startingObjectPositions}")
             
                 # Remove links containing that index
                 spring_lines = check_object_index(spring_lines, object_index_remove)
@@ -780,7 +777,7 @@ def remove_object(robot_idx, n_robot_population):
                 # Re-set objects
                 old_obj_pos = eval(all_lines[0])
                 r.startingObjectPositions = old_obj_pos
-                print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
+                # print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
                    
         # Rewrite
         all_lines[0] = str(r.startingObjectPositions) + '\n'
@@ -802,7 +799,7 @@ def remove_object(robot_idx, n_robot_population):
             
     r.springs = new_springs_robot
     r.n_springs = len(r.springs)
-    print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
+    # print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
     
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
@@ -823,8 +820,8 @@ def mutate_population(n_robot_population):
         springs_population[robot_idx] = r.springs
         startingObjectPositions_population[robot_idx] = r.startingObjectPositions
             
-
 # -------------------------------------------------------------
+
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
 os.system("rm controller/*.npz")
@@ -839,20 +836,15 @@ springs_population, startingObjectPositions_population = create_population(n_rob
 for idx, st in enumerate(startingObjectPositions_population):
     print(f"Robot {idx} -> {st}")
 
-
-
 for simulation_step in range(initial_robot_population-1):
     
     print(f"\nSIMULATION RUN {simulation_step+1}")
     robot_drawing = []
+    
     for robot_idx in range(n_robot_population):
         print(f"\nWorking on robot {robot_idx}")
         
         # Get objects and springs individual robots
-        # TODO: Gather info from springs_population and Starting Population by reading file at every simulation run.
-        # TODO: Right now, it only gets the init created population.
-
-        # TODO: if the robot_idx get reset to start from 0..curr_n_pop. Then springs_population should too be resized
         springs = springs_population[robot_idx]
         startingObjectPositions = startingObjectPositions_population[robot_idx]
 
@@ -934,7 +926,7 @@ print(f"\nEND SIMULATION")
 # Draw final robot.
 
 print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
-# r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
+r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
 Draw(max_steps, 0)
     
 # Create the video
