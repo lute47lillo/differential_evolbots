@@ -220,10 +220,6 @@ def Draw(frame_offset, robot_index):
             y = r.positions[time_step, object_idx][1]
             tai_gui.circle((x,y), color=0x0, radius=7)
             
-        # TODO: I think the last springs are not getting updated. Draw the springs
-        if frame_offset == 200:
-            print(f"Final robot springs: {r.springs}")
-            
         for spring_idx in range(r.n_springs):
             object_a_index = r.spring_anchor_a[spring_idx]
             object_b_index = r.spring_anchor_b[spring_idx]
@@ -263,7 +259,6 @@ def Initialize():
         
     # spring_anchor_a, spring_anchor_b = spring_anchors
     for spring_idx in range(r.n_springs):
-        print(r.springs)
         s = r.springs[spring_idx] # Get spring
         r.spring_anchor_a[spring_idx]         = s[0] # the a object of that spring
         r.spring_anchor_b[spring_idx]         = s[1]
@@ -653,7 +648,9 @@ def add_object(robot_index, is_spring_null):
     if is_spring_null:
         n_new_objects = 2
     else:
-        n_new_objects = random.randint(1, 3)
+        # n_new_objects = random.randint(1, 3)  # TODO: Add only 1 object at a time first
+        n_new_objects = 1
+    
     
     # Read from file existing objects
     with open(f"population/robot_{robot_index}.txt", 'r') as file:
@@ -822,6 +819,24 @@ def mutate_population(n_robot_population):
             
 # -------------------------------------------------------------
 
+def set_fittest_robot_draw(robot_index):
+    
+    with open(f"population/robot_{robot_index}.txt", 'r') as file:
+            
+            all_lines = file.readlines()
+            
+            # Get object positions
+            start_end_obj = eval(all_lines[0])
+            
+            # Get Springs
+            spring_obj = all_lines[1:]
+            _, spring_obj = get_last_obj_index(spring_obj)
+            
+    springs_population[robot_index] = spring_obj
+    startingObjectPositions_population[robot_index] = start_end_obj
+        
+# -------------------------------------------------------------
+
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
 os.system("rm controller/*.npz")
@@ -833,8 +848,8 @@ initial_robot_population = n_robot_population
 n_optimization_steps = 2
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
-for idx, st in enumerate(startingObjectPositions_population):
-    print(f"Robot {idx} -> {st}")
+# for idx, st in enumerate(startingObjectPositions_population):
+#     print(f"Robot {idx} -> {st}")
 
 for simulation_step in range(initial_robot_population-1):
     
@@ -880,7 +895,7 @@ for simulation_step in range(initial_robot_population-1):
                 else:
                     r.loss[None] = float(loss[None])
                 
-            # print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
+            print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
             
             # Fine-tune the brain of the robot
             tune_robots_brain()
@@ -925,8 +940,11 @@ print(f"\nEND SIMULATION")
 # TODO: You might need to instantiate the robot to be able to draw it. NOT USING ACTUAL FINAL ROBOT.
 # Draw final robot.
 
+# 
+# get last robot
+set_fittest_robot_draw(0)
 print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
-r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
+# r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
 Draw(max_steps, 0)
     
 # Create the video
