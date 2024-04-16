@@ -16,13 +16,13 @@ import shutil
     GLOBAL VARIABLES
 """
 max_steps = 200
-ground_height = 0.075
+ground_height = 0.1
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
-gravity = -9.8
-learning_rate = 1
+gravity = -9.89
+learning_rate = 1.02
 x_offset = 0.1 # How far from left screen robot starts
-damping = 0.65 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.75 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
 
@@ -119,7 +119,7 @@ def simulate_robot(robot_index):
     startingObjectPositions = []
     
     # First object is always given.
-    startingObjectPositions.append([x_offset, ground_height])
+    startingObjectPositions.append([x_offset, ground_height+0.03])
     
     # TODO: How many more are created? Should I start at least with 3 minimum?
     total_objects = random.randint(1, 5)
@@ -183,7 +183,7 @@ def Compute_loss():
     
     # Focus on position of the objects to determine loss fn. Arbitrary choice
     # Second component of zeroth object. Loss = Height of 0th objects at last time_step
-    loss[None] -= r.positions[r.max_steps-1, 0][1]
+    loss[None] -= 0.8*(r.positions[r.max_steps-1, 0][1] - 0.1) + 0.2*(r.goal[None][0] - r.center[r.max_steps-1][0])
     
 # -------------------------------------------------------------
 
@@ -554,11 +554,36 @@ def rename_dir(directory):
 
 # -------------------------------------------------------------
 
-def save_fitness_loss(robot_index):
+def save_fitness_losses(robot_index):
     # Write information of the robot morphology to text
     with open(f"fitness/loss_{robot_index}.txt", 'w') as file:
         file.write(str(r.loss))
+        file.close()
+      
+    # Track all losses over time independently  
+    with open(f"trackers/loss_{robot_index}.txt", 'a') as file:
+        save_loss = str(r.loss) + "\n"
+        file.write(save_loss)
+        file.close()        
         
+def check_last_and_prev_loss(robot_index):
+    
+    # Read losses over time independently  
+    with open(f"trackers/loss_{robot_index}.txt", 'r') as file:
+        lines = file.readlines()
+        
+        # Get first loss
+        prev_line = lines[-2]
+        prev_loss = float(prev_line.strip())
+        
+        # Get last loss
+        last_line = lines[-1]
+        last_loss = float(last_line.strip())
+        file.close()
+        
+    return prev_loss, last_loss
+        
+     
 def save_controller_weights(robot_index):
     
     # Write information of the robot morphology to text
@@ -797,20 +822,110 @@ def remove_object(robot_idx, n_robot_population):
     r.springs = new_springs_robot
     r.n_springs = len(r.springs)
     # print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
+
+
+# Function to update probability based on fitness
+def update_probabilities(n_robot_population, simulation_step):
+    """
+        Definition
+        -----------
+        
+            Updates last set of mutation action probabilities.
+            
+    """
     
+    for robot_idx in range(n_robot_population):
+        # Read from file existing objects
+        if simulation_step > 0:
+            previous_loss, last_loss = check_last_and_prev_loss(robot_idx)
+    
+            # Read from file existing objects
+            with open(f"trackers/act_prob_{robot_idx}.txt", 'r') as file:
+                all_lines = file.readlines()
+                last_line = all_lines[-1]
+            
+                # Get probabilities for each action
+                probabilities = last_line.split()
+                probabilities = [float(token) for token in probabilities]
+                
+                # TODO: Could include a delta that helps updating
+                # Update probabilities
+                if last_loss > (previous_loss): # Increase chance of not doing anything by a small probabiliity
+                    probabilities[0] = max(0.0, probabilities[0] - 0.1)
+                    probabilities[1] = max(0.0, probabilities[1] - 0.05)
+                    probabilities[2] = min(1.0, probabilities[2] + 0.15)
+                    
+                    total = probabilities[0] + probabilities[1]+ probabilities[2]
+                
+                elif last_loss > (previous_loss + 0.5): # Increase chance of not doing anything by a big probabiliity
+                    probabilities[0] = max(0.0, probabilities[0] - 0.3)
+                    probabilities[1] = max(0.0, probabilities[1] - 0.2)
+                    probabilities[2] = min(1.0, probabilities[2] + 0.5)
+                    
+                    total = probabilities[0] + probabilities[1]+ probabilities[2]
+                    
+                else: # Increase chance of adding or doing nothing.
+                    probabilities[0] = min(1.0, probabilities[0] + 0.6)
+                    probabilities[1] = max(0.0, probabilities[1] - 0.05)
+                    probabilities[2] = min(1.0, probabilities[2] + 0.35)
+                    
+                    total = probabilities[0] + probabilities[1]+ probabilities[2]
+
+                # Normalize the values
+                add_prob = probabilities[0] / total
+                remove_prob = probabilities[1] / total
+                nothing_prob = probabilities[2] / total
+                
+                print(total)
+                
+        else:
+            add_prob = 0.34
+            remove_prob = 0.33
+            nothing_prob = 0.33
+            
+        # Save to file
+        with open(f"trackers/act_prob_{robot_idx}.txt", 'a+') as file:
+            save_actions = str(add_prob) + " " + str(remove_prob) + " " + str(nothing_prob) + "\n"
+            file.write(save_actions)
+            file.close()
+            
+    return add_prob, remove_prob, nothing_prob
+
+def get_probabilities(robot_idx):
+    
+    # Read from file existing objects
+    with open(f"trackers/act_prob_{robot_idx}.txt", 'r') as file:
+        all_lines = file.readlines()
+        last_line = all_lines[-1]
+    
+        # Get probabilities for each action
+        probabilities = last_line.split()
+        probabilities = [float(token) for token in probabilities]
+        
+        add_prob = probabilities[0]
+        remove_prob = probabilities[1]
+        nothing_prob = probabilities[2]
+        
+    return add_prob, remove_prob, nothing_prob
 
 # TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
 # TODO: The better the loss has increased steadily, the more chances of doing nothing. The worse it has perform, the more it needs to mutate.
 def mutate_population(n_robot_population):
-    
+
     for robot_idx in range(n_robot_population):
-        mutation_choice = random.randint(0,2)
+        
+        # Choose mutation action based on updated probability
+        add_prob, remove_prob, nothing_prob = get_probabilities(robot_idx)
+        mutation_action = random.choices([0, 1, 2], weights=[add_prob, remove_prob, nothing_prob])[0]
+        print(f"Chosen: {mutation_action}. Probabilties are: {add_prob}, {remove_prob}, {nothing_prob}")
+        
+        # mutation_choice = random.randint(0,2)
     
-        if mutation_choice == 0:
+        if mutation_action == 0:
             # Add an object - Spring
             add_object(robot_idx, False)
    
-        elif mutation_choice == 1:
+        elif mutation_action == 1:
             # Remove an object - Spring
             remove_object(robot_idx, n_robot_population)
             
@@ -839,13 +954,14 @@ def set_fittest_robot_draw(robot_index):
 
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
+os.system("rm trackers/*.txt")
 os.system("rm controller/*.npz")
 os.system("rm -rf images/*")
 
 # Create population of robots
-n_robot_population = 5
+n_robot_population = 10
 initial_robot_population = n_robot_population
-n_optimization_steps = 2
+n_optimization_steps = 10
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 # for idx, st in enumerate(startingObjectPositions_population):
@@ -908,10 +1024,12 @@ for simulation_step in range(initial_robot_population-1):
                 Draw(0, robot_idx)
             
             # Save the fitness loss
-            save_fitness_loss(robot_idx)     
+            if opt_step == n_optimization_steps - 1:
+                save_fitness_losses(robot_idx)
             
-            # TODO: Save optimized steps Across simulation runs. Right now, it re-starts the controller optimization for each run.
+            # Save optimized steps Across simulation runs.
             save_controller_weights(robot_idx)  
+            
 
     # Eliminate the lowest-ranked individual by fitness
     idx_robot_delete = eliminate_individual(n_robot_population)
@@ -929,6 +1047,10 @@ for simulation_step in range(initial_robot_population-1):
     startingObjectPositions_population.pop(idx_robot_delete)
          
     if n_robot_population != 1:
+        
+        # Update Action probabilities #TODO: probabilities files need to be tracked correctly.
+        update_probabilities(robot_idx, simulation_step)
+            
         # Mutate remaining individuals
         mutate_population(n_robot_population)
     
