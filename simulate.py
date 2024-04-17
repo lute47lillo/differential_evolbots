@@ -21,7 +21,7 @@ ground_height = 0.1
 stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.89
-learning_rate = 1.02
+learning_rate = 1.1
 x_offset = 0.1 # How far from left screen robot starts
 damping = 0.75 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
@@ -534,45 +534,6 @@ def Create_video():
 
 # -------------------------------------------------------------
 
-# Helper function to set indices of files back in range of 0...n_robot_population
-def re_order_files(directory, attr):
-    
-    # Get the list of files in the directory
-    files = os.listdir(directory)
-    
-    # Sort the files by their index in ascending order
-    files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
-    
-    # Loop through the files and rename them
-    for idx, filename in enumerate(files):
-        old_path = os.path.join(directory, filename)
-        new_filename = f"{attr}_{idx}.txt"
-        new_path = os.path.join(directory, new_filename)
-        
-        # Rename the file only if its name is different from the new name
-        if filename != new_filename:
-            os.rename(old_path, new_path)
-            print(f"Renamed '{directory}' '{filename}' to '{new_filename}'")
-            
-def rename_dir(directory):
-    
-    # Get the list of files in the directory
-    dirs = os.listdir(directory)
-    
-    # Sort the files by their index in ascending order
-    dirs.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
-    
-    # Loop through the files and rename them
-    for idx, dir_name in enumerate(dirs):
-        old_path = directory + "/" + dir_name
-        new_dir_ename = f"robot_{idx}"
-        new_path = directory + "/" + new_dir_ename
-        
-        # Rename the file only if its name is different from the new name
-        if dir_name != new_dir_ename:
-            os.rename(old_path, new_path)
-            print(f"Renamed dir '{dir_name}' to '{new_dir_ename}'")
-
 # -------------------------------------------------------------
 
 def save_fitness_losses(robot_index):
@@ -648,6 +609,7 @@ def eliminate_individual(n_robot_population):
     os.system(f"rm fitness/loss_{idx_robot_delete}.txt")
     os.system(f"rm trackers_prob/prob_{idx_robot_delete}.txt")
     os.system(f"rm trackers_loss/loss_{idx_robot_delete}.txt")
+    os.system(f"rm controller/weights_{idx_robot_delete}.npz")
     shutil.rmtree(f"images/robot_{idx_robot_delete}/")
     
     return idx_robot_delete
@@ -895,7 +857,7 @@ os.system("rm -rf images/*")
 # Create population of robots
 n_robot_population = 10
 initial_robot_population = n_robot_population
-n_optimization_steps = 10
+n_optimization_steps = 15
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(initial_robot_population-1):
@@ -964,11 +926,12 @@ for simulation_step in range(initial_robot_population-1):
     idx_robot_delete = eliminate_individual(n_robot_population)
     
     # Re-order file indices for simplicity
-    re_order_files("population", "robot")
-    re_order_files("fitness", "loss")
-    re_order_files("trackers_prob", "prob")
-    re_order_files("trackers_loss", "loss")
-    rename_dir("images")
+    utils.re_order_files("population", "robot")
+    utils.re_order_files("fitness", "loss")
+    utils.re_order_files("trackers_prob", "prob")
+    utils.re_order_files("trackers_loss", "loss")
+    utils.re_order_files("controller", "weights")
+    utils.rename_dir("images")
             
     # Set new number of individuals in population
     n_robot_population -= 1

@@ -51,16 +51,17 @@ def plot_loss(lists, xmax):
     
 def plot_loss_2(lists, xmax):
     # Create a 5x4 grid of subplots
-    fig, axs = plt.subplots(5, 4, figsize=(20, 16))
+    # TODO: Create grid of plots based on how many are in the list
+    fig, axs = plt.subplots(4, 3, figsize=(20, 16))
 
     x_ticks = []
-    for i in range(-1, 20):
+    for i in range(-1, len(lists)):
         x_ticks.append(i)
         
     # Plot each list in a subplot
     for idx, lst in enumerate(lists):
-        row = idx // 4
-        col = idx % 4
+        row = idx // 3
+        col = idx % 3
         x = range(len(lst))
         
         # Plot dots at specific values

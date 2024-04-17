@@ -8,6 +8,51 @@
         calculate diverse simulation-related values.
 
 """
+import os
+
+# Helper function to set indices of files back in range of 0...n_robot_population
+def re_order_files(directory, attr):
+    
+    # Get the list of files in the directory
+    files = os.listdir(directory)
+    
+    # Sort the files by their index in ascending order
+    files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+    
+    # Loop through the files and rename them
+    for idx, filename in enumerate(files):
+        old_path = os.path.join(directory, filename)
+        
+        if attr == 'weights':
+            new_filename = f"{attr}_{idx}.npz"
+        else:
+            new_filename = f"{attr}_{idx}.txt"
+            
+        new_path = os.path.join(directory, new_filename)
+        
+        # Rename the file only if its name is different from the new name
+        if filename != new_filename:
+            os.rename(old_path, new_path)
+            print(f"Renamed '{directory}' '{filename}' to '{new_filename}'")
+            
+def rename_dir(directory):
+    
+    # Get the list of files in the directory
+    dirs = os.listdir(directory)
+    
+    # Sort the files by their index in ascending order
+    dirs.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+    
+    # Loop through the files and rename them
+    for idx, dir_name in enumerate(dirs):
+        old_path = directory + "/" + dir_name
+        new_dir_ename = f"robot_{idx}"
+        new_path = directory + "/" + new_dir_ename
+        
+        # Rename the file only if its name is different from the new name
+        if dir_name != new_dir_ename:
+            os.rename(old_path, new_path)
+            print(f"Renamed dir '{dir_name}' to '{new_dir_ename}'")
 
 def track_values(robot_idx):
     """
@@ -105,17 +150,17 @@ def update_probabilities(n_robot_population, simulation_step):
                 
                 # TODO: Could include a delta that helps updating
                 # Update probabilities
-                if last_loss > previous_loss:
-                    probabilities[0] = min(1.0, probabilities[0] + 0.55)
-                    probabilities[1] = max(0.0, probabilities[1] - 0.15)
-                    probabilities[2] = max(0.0, probabilities[2] - 0.4)
+                if last_loss > previous_loss: # Worse loss than prev. 
+                    probabilities[0] = min(1.0, probabilities[0] + 0.35)
+                    probabilities[1] = max(0.0, probabilities[1] - 0.1)
+                    probabilities[2] = max(0.0, probabilities[2] - 0.25)
                                     
-                elif last_loss > (previous_loss + 0.3): 
+                elif last_loss > (previous_loss + 0.5): 
                     probabilities[0] = min(1.0, probabilities[0] + 0.8)
                     probabilities[1] = max(0.0, probabilities[1] - 0.4)
                     probabilities[2] = max(0.0, probabilities[2] - 0.4)
                                         
-                elif last_loss < (previous_loss - 0.4):  # New loss is way smaller than previous -> Increase doing nothing
+                elif last_loss < (previous_loss - 0.5):  # New loss is way smaller than previous -> Increase doing nothing
                     probabilities[0] = max(0.0, probabilities[0] - 0.35)
                     probabilities[1] = max(0.0, probabilities[1] - 0.35)
                     probabilities[2] = min(1.0, probabilities[2] + 0.7)
