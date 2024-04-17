@@ -509,6 +509,11 @@ def tune_sh_weights():
         
 def tune_robots_brain():
     
+    prev_w_SH = r.weightsSH
+    prev_w_HM = r.weightsHM
+    prev_w_hidden = r.hidden
+    prev_w_bias_hidden = r.bias_hidden
+    
     # Fine-tune hidden to motor layer
     tune_hm_weights()
 
@@ -517,6 +522,8 @@ def tune_robots_brain():
         
     # Fine-tune sensor to hidden layer
     tune_sh_weights()
+    
+    return prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden
             
 # -------------------------------------------------------------
 
@@ -581,20 +588,25 @@ def save_fitness_losses(robot_index):
         file.close()        
         
 # TODO: Save controllers only if new loss is better than previous
-def save_controller_weights(robot_index, sim_step):
+def save_controller_weights(robot_index, sim_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden):
         
-    # Write information of the robot morphology to text
+    # Get new optimized weights.
     weightsSH_arr = r.weightsSH.to_numpy()
     weightsHM_arr = r.weightsHM.to_numpy()
     hidden_arr = r.hidden.to_numpy()
     bias_hidden_arr = r.bias_hidden.to_numpy()
     
-    # Check: 1st - Save always in first run. 2nd - If last loss is worse, do not save new controllers.
-    if sim_step > 0: 
+    # Check: 1st - Save always in first run. 2nd - If last loss is worse, Save controllers without updating.
+    if sim_step > 1 and (opt_step == n_optimization_steps - 1): 
         prev_loss, last_loss = utils.check_last_and_prev_loss(robot_index)
-        if last_loss > prev_loss:
-            return
-    
+        if last_loss > (prev_loss + 0.02):
+            print(f"\nRobot {robot_index} not saving optimized controllers.")
+            weightsSH_arr = prev_w_SH.to_numpy()
+            weightsHM_arr = prev_w_HM.to_numpy()
+            hidden_arr = prev_w_hidden.to_numpy()
+            bias_hidden_arr = prev_w_bias_hidden.to_numpy()
+            
+    # Save controllers
     np.savez(f'controller/weights_{robot_index}.npz', weightsSH=weightsSH_arr, weightsHM=weightsHM_arr,
              hidden=hidden_arr, bias_hidden=bias_hidden_arr)
         
@@ -881,9 +893,9 @@ os.system(f"rm stats/loss.txt")
 os.system("rm -rf images/*")
 
 # Create population of robots
-n_robot_population = 20
+n_robot_population = 10
 initial_robot_population = n_robot_population
-n_optimization_steps = 3
+n_optimization_steps = 10
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(initial_robot_population-1):
@@ -912,7 +924,8 @@ for simulation_step in range(initial_robot_population-1):
                 Initialize_Neural_Network()
             else:
                 load_controller_weights(robot_idx)
-                
+            
+            # Init Robot
             Initialize()
             
             with tai.Tape(loss):
@@ -933,7 +946,7 @@ for simulation_step in range(initial_robot_population-1):
             print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
             
             # Fine-tune the brain of the robot
-            tune_robots_brain()
+            prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden = tune_robots_brain()
             
             # Draw First Optimization Step
             if opt_step == 0 and simulation_step == 0:
@@ -945,9 +958,8 @@ for simulation_step in range(initial_robot_population-1):
                 save_fitness_losses(robot_idx)
             
             # Save optimized steps Across simulation runs.
-            save_controller_weights(robot_idx, simulation_step)  
+            save_controller_weights(robot_idx, simulation_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
             
-
     # Eliminate the lowest-ranked individual by fitness
     idx_robot_delete = eliminate_individual(n_robot_population)
     
@@ -978,7 +990,7 @@ print(f"\nEND SIMULATION")
 # Get last robot
 set_fittest_robot_draw(0)
 utils.track_values(0)
-print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
+# print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
 # r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
 
 # Draw final robot.
