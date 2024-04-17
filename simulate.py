@@ -7,6 +7,7 @@ import math
 import random
 from robot import Robot
 import shutil
+import utils
 
 # -------------------------------------------------------------
 # move the object to max use the taichi's differentiable routine.
@@ -36,14 +37,27 @@ def n_sensors(n_objects):
 
 # -----------------------------------------------------------------
 
-# TODO: Use helper function on initial creation of population.
 def generate_obj_positions(n_objects):
+    """
+        Definition
+        -----------
+            Generates an object based on x, y coordinates.
+            
+        Parameters
+        -----------
+            - n_objects (int): number of objects to be generated
+            
+        Returns
+        -----------
+            - new_obj_pos (list): List of newly created objects for a given robot.
+
+    """
     
     new_obj_pos = []
     for _ in range(n_objects):
         
         # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0, 0.3)
+        obj_x_pos = random.uniform(0, 0.25)
         obj_y_pos = random.uniform(0, 0.3)
         
         # Check there is no object in same x and y.
@@ -183,7 +197,7 @@ def Compute_loss():
     
     # Focus on position of the objects to determine loss fn. Arbitrary choice
     # Second component of zeroth object. Loss = Height of 0th objects at last time_step
-    loss[None] -= 0.8*(r.positions[r.max_steps-1, 0][1] - 0.1) + 0.2*(r.goal[None][0] - r.center[r.max_steps-1][0])
+    loss[None] -= 0.85*(r.positions[r.max_steps-1, 0][1] - 0.1) + 0.15*(r.goal[None][0] - r.center[r.max_steps-1][0])
     
 # -------------------------------------------------------------
 
@@ -531,7 +545,7 @@ def re_order_files(directory, attr):
         # Rename the file only if its name is different from the new name
         if filename != new_filename:
             os.rename(old_path, new_path)
-            print(f"Renamed '{filename}' to '{new_filename}'")
+            print(f"Renamed '{directory}' '{filename}' to '{new_filename}'")
             
 def rename_dir(directory):
     
@@ -550,7 +564,7 @@ def rename_dir(directory):
         # Rename the file only if its name is different from the new name
         if dir_name != new_dir_ename:
             os.rename(old_path, new_path)
-            print(f"Renamed '{dir_name}' to '{new_dir_ename}'")
+            print(f"Renamed dir '{dir_name}' to '{new_dir_ename}'")
 
 # -------------------------------------------------------------
 
@@ -561,36 +575,25 @@ def save_fitness_losses(robot_index):
         file.close()
       
     # Track all losses over time independently  
-    with open(f"trackers/loss_{robot_index}.txt", 'a') as file:
+    with open(f"trackers_loss/loss_{robot_index}.txt", 'a') as file:
         save_loss = str(r.loss) + "\n"
         file.write(save_loss)
         file.close()        
         
-def check_last_and_prev_loss(robot_index):
-    
-    # Read losses over time independently  
-    with open(f"trackers/loss_{robot_index}.txt", 'r') as file:
-        lines = file.readlines()
+# TODO: Save controllers only if new loss is better than previous
+def save_controller_weights(robot_index, sim_step):
         
-        # Get first loss
-        prev_line = lines[-2]
-        prev_loss = float(prev_line.strip())
-        
-        # Get last loss
-        last_line = lines[-1]
-        last_loss = float(last_line.strip())
-        file.close()
-        
-    return prev_loss, last_loss
-        
-     
-def save_controller_weights(robot_index):
-    
     # Write information of the robot morphology to text
     weightsSH_arr = r.weightsSH.to_numpy()
     weightsHM_arr = r.weightsHM.to_numpy()
     hidden_arr = r.hidden.to_numpy()
     bias_hidden_arr = r.bias_hidden.to_numpy()
+    
+    # Check: 1st - Save always in first run. 2nd - If last loss is worse, do not save new controllers.
+    if sim_step > 0: 
+        prev_loss, last_loss = utils.check_last_and_prev_loss(robot_index)
+        if last_loss > prev_loss:
+            return
     
     np.savez(f'controller/weights_{robot_index}.npz', weightsSH=weightsSH_arr, weightsHM=weightsHM_arr,
              hidden=hidden_arr, bias_hidden=bias_hidden_arr)
@@ -626,10 +629,13 @@ def eliminate_individual(n_robot_population):
                 print(f"\nNew Worst fitness robot {idx_robot_delete} -> {temp_lowest}")
     
     print(f"Eliminating robot {idx_robot_delete}\n")
+    utils.track_values(idx_robot_delete)
     
     # Delete population, fitness and image files
     os.system(f"rm population/robot_{idx_robot_delete}.txt")
     os.system(f"rm fitness/loss_{idx_robot_delete}.txt")
+    os.system(f"rm trackers_prob/prob_{idx_robot_delete}.txt")
+    os.system(f"rm trackers_loss/loss_{idx_robot_delete}.txt")
     shutil.rmtree(f"images/robot_{idx_robot_delete}/")
     
     return idx_robot_delete
@@ -823,103 +829,15 @@ def remove_object(robot_idx, n_robot_population):
     r.n_springs = len(r.springs)
     # print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
 
-
-# Function to update probability based on fitness
-def update_probabilities(n_robot_population, simulation_step):
-    """
-        Definition
-        -----------
-        
-            Updates last set of mutation action probabilities.
-            
-    """
-    
-    for robot_idx in range(n_robot_population):
-        # Read from file existing objects
-        if simulation_step > 0:
-            previous_loss, last_loss = check_last_and_prev_loss(robot_idx)
-    
-            # Read from file existing objects
-            with open(f"trackers/act_prob_{robot_idx}.txt", 'r') as file:
-                all_lines = file.readlines()
-                last_line = all_lines[-1]
-            
-                # Get probabilities for each action
-                probabilities = last_line.split()
-                probabilities = [float(token) for token in probabilities]
-                
-                # TODO: Could include a delta that helps updating
-                # Update probabilities
-                if last_loss > (previous_loss): # Increase chance of not doing anything by a small probabiliity
-                    probabilities[0] = max(0.0, probabilities[0] - 0.1)
-                    probabilities[1] = max(0.0, probabilities[1] - 0.05)
-                    probabilities[2] = min(1.0, probabilities[2] + 0.15)
-                    
-                    total = probabilities[0] + probabilities[1]+ probabilities[2]
-                
-                elif last_loss > (previous_loss + 0.5): # Increase chance of not doing anything by a big probabiliity
-                    probabilities[0] = max(0.0, probabilities[0] - 0.3)
-                    probabilities[1] = max(0.0, probabilities[1] - 0.2)
-                    probabilities[2] = min(1.0, probabilities[2] + 0.5)
-                    
-                    total = probabilities[0] + probabilities[1]+ probabilities[2]
-                    
-                else: # Increase chance of adding or doing nothing.
-                    probabilities[0] = min(1.0, probabilities[0] + 0.6)
-                    probabilities[1] = max(0.0, probabilities[1] - 0.05)
-                    probabilities[2] = min(1.0, probabilities[2] + 0.35)
-                    
-                    total = probabilities[0] + probabilities[1]+ probabilities[2]
-
-                # Normalize the values
-                add_prob = probabilities[0] / total
-                remove_prob = probabilities[1] / total
-                nothing_prob = probabilities[2] / total
-                
-                print(total)
-                
-        else:
-            add_prob = 0.34
-            remove_prob = 0.33
-            nothing_prob = 0.33
-            
-        # Save to file
-        with open(f"trackers/act_prob_{robot_idx}.txt", 'a+') as file:
-            save_actions = str(add_prob) + " " + str(remove_prob) + " " + str(nothing_prob) + "\n"
-            file.write(save_actions)
-            file.close()
-            
-    return add_prob, remove_prob, nothing_prob
-
-def get_probabilities(robot_idx):
-    
-    # Read from file existing objects
-    with open(f"trackers/act_prob_{robot_idx}.txt", 'r') as file:
-        all_lines = file.readlines()
-        last_line = all_lines[-1]
-    
-        # Get probabilities for each action
-        probabilities = last_line.split()
-        probabilities = [float(token) for token in probabilities]
-        
-        add_prob = probabilities[0]
-        remove_prob = probabilities[1]
-        nothing_prob = probabilities[2]
-        
-    return add_prob, remove_prob, nothing_prob
-
-# TODO: Ideally the probabilites of one happening should be based on how the loss function of a certain robot changes over time.
-# TODO: The better the loss has increased steadily, the more chances of doing nothing. The worse it has perform, the more it needs to mutate.
 def mutate_population(n_robot_population):
 
     for robot_idx in range(n_robot_population):
         
         # Choose mutation action based on updated probability
-        add_prob, remove_prob, nothing_prob = get_probabilities(robot_idx)
+        mutations = ["Add", "Remove", "Nothing"]
+        add_prob, remove_prob, nothing_prob = utils.get_probabilities(robot_idx)
         mutation_action = random.choices([0, 1, 2], weights=[add_prob, remove_prob, nothing_prob])[0]
-        print(f"Chosen: {mutation_action}. Probabilties are: {add_prob}, {remove_prob}, {nothing_prob}")
-        
-        # mutation_choice = random.randint(0,2)
+        print(f"Robot {robot_idx} - Mutation: {mutations[mutation_action]}. Probabilties are: {add_prob}, {remove_prob}, {nothing_prob}")
     
         if mutation_action == 0:
             # Add an object - Spring
@@ -932,6 +850,8 @@ def mutate_population(n_robot_population):
         springs_population[robot_idx] = r.springs
         startingObjectPositions_population[robot_idx] = r.startingObjectPositions
             
+# -------------------------------------------------------------
+
 # -------------------------------------------------------------
 
 def set_fittest_robot_draw(robot_index):
@@ -954,18 +874,17 @@ def set_fittest_robot_draw(robot_index):
 
 os.system("rm population/*.txt")
 os.system("rm fitness/*.txt")
-os.system("rm trackers/*.txt")
+os.system("rm trackers_prob/*.txt")
+os.system("rm trackers_loss/*.txt")
 os.system("rm controller/*.npz")
+os.system(f"rm stats/loss.txt")
 os.system("rm -rf images/*")
 
 # Create population of robots
-n_robot_population = 10
+n_robot_population = 20
 initial_robot_population = n_robot_population
-n_optimization_steps = 10
+n_optimization_steps = 3
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
-
-# for idx, st in enumerate(startingObjectPositions_population):
-#     print(f"Robot {idx} -> {st}")
 
 for simulation_step in range(initial_robot_population-1):
     
@@ -1016,8 +935,6 @@ for simulation_step in range(initial_robot_population-1):
             # Fine-tune the brain of the robot
             tune_robots_brain()
             
-            # TODO: It does not need to draw the first optimization step for all, but will need to save the values. 
-            # TODO: As of now, we might just draw the final optimization.
             # Draw First Optimization Step
             if opt_step == 0 and simulation_step == 0:
                 os.system(f"rm images/robot_{robot_idx}/*.png")
@@ -1028,7 +945,7 @@ for simulation_step in range(initial_robot_population-1):
                 save_fitness_losses(robot_idx)
             
             # Save optimized steps Across simulation runs.
-            save_controller_weights(robot_idx)  
+            save_controller_weights(robot_idx, simulation_step)  
             
 
     # Eliminate the lowest-ranked individual by fitness
@@ -1037,6 +954,8 @@ for simulation_step in range(initial_robot_population-1):
     # Re-order file indices for simplicity
     re_order_files("population", "robot")
     re_order_files("fitness", "loss")
+    re_order_files("trackers_prob", "prob")
+    re_order_files("trackers_loss", "loss")
     rename_dir("images")
             
     # Set new number of individuals in population
@@ -1048,25 +967,21 @@ for simulation_step in range(initial_robot_population-1):
          
     if n_robot_population != 1:
         
-        # Update Action probabilities #TODO: probabilities files need to be tracked correctly.
-        update_probabilities(robot_idx, simulation_step)
+        # Update Action probabilities
+        utils.update_probabilities(robot_idx, simulation_step)
             
         # Mutate remaining individuals
         mutate_population(n_robot_population)
     
 print(f"\nEND SIMULATION")
 
-# TODO: Fix draw problem. It should create 2 movies, inital video and final video
-# rename_dir("images")
-
-# TODO: You might need to instantiate the robot to be able to draw it. NOT USING ACTUAL FINAL ROBOT.
-# Draw final robot.
-
-# 
-# get last robot
+# Get last robot
 set_fittest_robot_draw(0)
+utils.track_values(0)
 print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
 # r = Robot(springs_population[0], startingObjectPositions_population[0], max_steps)
+
+# Draw final robot.
 Draw(max_steps, 0)
     
 # Create the video
