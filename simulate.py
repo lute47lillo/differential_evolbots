@@ -10,18 +10,18 @@ import shutil
 import utils
 
 # -------------------------------------------------------------
-# move the object to max use the taichi's differentiable routine.
-# TODO: Taichi's Fields documentation !
 
 """
     GLOBAL VARIABLES
+    TODO: Create a single file to have all global variables.
 """
 max_steps = 200
 ground_height = 0.1
-stiffness = 1000 # Strength of the spring in the example
+stiffness = 900 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.89
-learning_rate = 1.1
+learning_rate = 1
+piston_force = 0.08 # Force applied to the actuations. Bigger, piston force, less acrobatic
 x_offset = 0.1 # How far from left screen robot starts
 damping = 0.75 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
@@ -30,85 +30,6 @@ n_sin_waves = 10
 """
     UTIL FUNCTIONS
 """
-# -----------------------------------------------------------------
-
-def n_sensors(n_objects):
-    return n_sin_waves + 4 * n_objects + 2
-
-# -----------------------------------------------------------------
-
-def generate_obj_positions(n_objects):
-    """
-        Definition
-        -----------
-            Generates an object based on x, y coordinates.
-            
-        Parameters
-        -----------
-            - n_objects (int): number of objects to be generated
-            
-        Returns
-        -----------
-            - new_obj_pos (list): List of newly created objects for a given robot.
-
-    """
-    
-    new_obj_pos = []
-    for _ in range(n_objects):
-        
-        # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0, 0.25)
-        obj_y_pos = random.uniform(0, 0.3)
-        
-        # Check there is no object in same x and y.
-        for created_obj in new_obj_pos:
-            x, y = created_obj
-            
-            # Add an arbitrary offset to undraw
-            if x == obj_x_pos and y == obj_y_pos:
-                obj_x_pos += 0.05
-                obj_y_pos += 0.05
-        
-        # Add object
-        new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
-        
-    return new_obj_pos
-
-# -----------------------------------------------------------------
-
-def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
-    """
-        Definition
-        -----------
-            Create a spring between objects at index i-th and j-th in the list startingObjectPositions. 
-            Can be either motorized or not. Appends to list of springs.
-            
-        Parameters
-        -----------
-            - springs_robot (list): list of information of the generated robot.
-            - i (int): object at index i-th in startingObjectPositions
-            - j (int): object at index j-th in startingObjectPositions
-            - is_motor (int): if the spring is motorized or not.
-            - startingObjectPositions (list): List of objects of the specific robot.
-            
-        Returns
-        -----------
-            None
-    """
-    
-    object_a = startingObjectPositions[i]
-    object_b = startingObjectPositions[j]
-
-    # Get x and y coordinates of objects to calculate distance
-    x_distanceAB = object_a[0] - object_b[0]
-    y_distanceAB = object_a[1] - object_b[1]
-
-    # Pythagorean Distance.
-    # Springs need a "at rest"-length that is the length that "likes" to stay at.
-    distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
-    resting_length = distance_A_to_B
-    
-    springs_robot.append([i, j, resting_length, is_motor])
 
 # -----------------------------------------------------------------
 
@@ -139,13 +60,13 @@ def simulate_robot(robot_index):
     total_objects = random.randint(1, 5)
     
     # Generate the objects
-    startingObjectPositions += generate_obj_positions(total_objects)
+    startingObjectPositions += utils.generate_obj_positions(total_objects)
         
     # Generate Springs. Randomly select if they are motorized or not.
     for i in range(len(startingObjectPositions)):
         for j in range(i+1, len(startingObjectPositions)):
             is_motor = random.choice([0, 1])
-            create_spring(springs_robot, i, j, is_motor, startingObjectPositions)
+            utils.create_spring(springs_robot, i, j, is_motor, startingObjectPositions)
  
     # Write information of the robot morphology to text
     with open(f"population/robot_{robot_index}.txt", 'w') as file:
@@ -197,7 +118,7 @@ def Compute_loss():
     
     # Focus on position of the objects to determine loss fn. Arbitrary choice
     # Second component of zeroth object. Loss = Height of 0th objects at last time_step
-    loss[None] -= 0.85*(r.positions[r.max_steps-1, 0][1] - 0.1) + 0.15*(r.goal[None][0] - r.center[r.max_steps-1][0])
+    loss[None] -= 1.3 * (r.positions[r.max_steps-1, 0][1] - 0.1) - 0.3*(r.goal[None][0] - r.center[r.max_steps-1][0])
     
 # -------------------------------------------------------------
 
@@ -318,7 +239,7 @@ def Initialize_Neural_Network():
     """
     # Initialize sensor to hidden neurons
     for i in range(r.n_hidden_neurons):
-        for j in range(n_sensors(r.n_objects)):
+        for j in range(utils.n_sensors(r.n_objects)):
             r.weightsSH[i,j] = np.random.randn() * 0.2 - 0.1
     
     # Init bias for hidden neurons
@@ -417,11 +338,10 @@ def simulate_springs(time_step: tai.i32):
         spring_resting_length = r.spring_at_rest_length[spring_idx]
         
         # Applying the sinuisoidal function to have the piston of the motor (the cause of the movement be in that range)
-        # TODO: Adapt the force_of_piston constant to be an actual variable
         # spring_resting_length = spring_resting_length + 0.08 * spring_actuation[spring_idx] * tai.sin(0.9*time_step)
         
         # Newer version takes the motorized action form the NN. Keep value small
-        spring_resting_length = spring_resting_length + 0.07 * r.spring_actuation[spring_idx] * r.actuation[time_step, spring_idx]
+        spring_resting_length = spring_resting_length + piston_force * r.spring_actuation[spring_idx] * r.actuation[time_step, spring_idx]
         
         # Difference between current and supposed initial at that index
         spring_difference = curr_rest_length - spring_resting_length
@@ -450,7 +370,7 @@ def simulate_objects(time_step: tai.i32):
                         r.spring_forces_on_objects[time_step, object_idx]) # Change velocity as fn of gravity by dt and the spring forces
         
         # Detect collisions. And check that velocity is still moving as cause of motor
-        if old_pos[1] <= ground_height and old_velocity[1] < 0:
+        if old_pos[1] <= (ground_height + 0.01) and old_velocity[1] < 0:
             
             old_velocity = tai.Vector([0,0])
         
@@ -524,18 +444,11 @@ def tune_robots_brain():
     tune_sh_weights()
     
     return prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden
-            
-# -------------------------------------------------------------
 
-# Create Video
-def Create_video():
-    os.system("rm movie.p4")
-    os.system(" ffmpeg -i images/robot_0/image_%d.png movie.mp4")
 
 # -------------------------------------------------------------
 
-# -------------------------------------------------------------
-
+# TODO: pass loss as parameter and move function to utils
 def save_fitness_losses(robot_index):
     # Write information of the robot morphology to text
     with open(f"fitness/loss_{robot_index}.txt", 'w') as file:
@@ -583,6 +496,7 @@ def load_controller_weights(robot_index):
     r.bias_hidden.from_numpy(data["bias_hidden"])
     
 # -------------------------------------------------------------
+
 def eliminate_individual(n_robot_population):
     
     # Lowest fitness is in our case the highest positive value because we want to minimize it.
@@ -670,7 +584,7 @@ def add_object(robot_index, is_spring_null):
         new_largest_idx = largest_idx + 1
         
         # Generate objects
-        new_obj_pos = generate_obj_positions(n_new_objects)
+        new_obj_pos = utils.generate_obj_positions(n_new_objects)
         
         # Combine old and new objects
         total_obj_list = old_obj_pos + new_obj_pos
@@ -685,7 +599,7 @@ def add_object(robot_index, is_spring_null):
             for j in range(new_largest_idx, len(total_obj_list)):
                 if i < j:
                     is_motor = random.choice([0, 1])    
-                    create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
+                    utils.create_spring(new_springs_robot, i, j, is_motor, total_obj_list)
         
         # TODO: Current springs are not given as 
         total_new_springs = current_springs + new_springs_robot
@@ -846,18 +760,13 @@ def set_fittest_robot_draw(robot_index):
         
 # -------------------------------------------------------------
 
-os.system("rm population/*.txt")
-os.system("rm fitness/*.txt")
-os.system("rm trackers_prob/*.txt")
-os.system("rm trackers_loss/*.txt")
-os.system("rm controller/*.npz")
-os.system(f"rm stats/loss.txt")
-os.system("rm -rf images/*")
+# Clean files for simulation
+utils.remove_files_before_simulation()
 
 # Create population of robots
 n_robot_population = 10
+n_optimization_steps = 10
 initial_robot_population = n_robot_population
-n_optimization_steps = 15
 springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
 for simulation_step in range(initial_robot_population-1):
@@ -886,7 +795,7 @@ for simulation_step in range(initial_robot_population-1):
                 Initialize_Neural_Network()
             else:
                 load_controller_weights(robot_idx)
-            
+                
             # Init Robot
             Initialize()
             
@@ -926,12 +835,7 @@ for simulation_step in range(initial_robot_population-1):
     idx_robot_delete = eliminate_individual(n_robot_population)
     
     # Re-order file indices for simplicity
-    utils.re_order_files("population", "robot")
-    utils.re_order_files("fitness", "loss")
-    utils.re_order_files("trackers_prob", "prob")
-    utils.re_order_files("trackers_loss", "loss")
-    utils.re_order_files("controller", "weights")
-    utils.rename_dir("images")
+    utils.update_files()
             
     # Set new number of individuals in population
     n_robot_population -= 1
@@ -958,6 +862,8 @@ utils.track_values(0)
 
 # Draw final robot.
 Draw(max_steps, 0)
-    
+
 # Create the video
-Create_video()
+# TODO: Make experiment name be command argument name
+experiment_name = "Test_1"
+utils.create_video(experiment_name)

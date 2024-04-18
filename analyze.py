@@ -27,10 +27,11 @@ def read_statistics_file():
 
     # Find the length of the longest list
     xmax = max(len(lst) for lst in lists)
+    xmin = min(min(lst) for lst in lists)
     
-    return lists, xmax
+    return lists, xmax, xmin
 
-def plot_loss(lists, xmax):
+def plot_loss(lists, xmax, xmin):
     
     # Plot each list as a line
     for lst in lists:
@@ -49,19 +50,25 @@ def plot_loss(lists, xmax):
     plt.savefig(f"plots/loss.png")
     # plt.show()
     
-def plot_loss_2(lists, xmax):
+def plot_loss_2(lists, xmin):
     # Create a 5x4 grid of subplots
     # TODO: Create grid of plots based on how many are in the list
-    fig, axs = plt.subplots(4, 3, figsize=(20, 16))
+    fig, axs = plt.subplots(5, 6, figsize=(40, 20))
 
     x_ticks = []
-    for i in range(-1, len(lists)):
-        x_ticks.append(i)
+    for i in range(0, len(lists)):
+        x_ticks.append(i) 
+   
+    y_ticks = []
+    current = xmin
+    while current <= 0:
+        y_ticks.append(round(current, 2))  # Round to 2 decimal places
+        current += 0.03
         
     # Plot each list in a subplot
     for idx, lst in enumerate(lists):
-        row = idx // 3
-        col = idx % 3
+        row = idx // 6
+        col = idx % 6
         x = range(len(lst))
         
         # Plot dots at specific values
@@ -69,7 +76,7 @@ def plot_loss_2(lists, xmax):
         axs[row, col].scatter(x, lst, color='red', zorder=5)
 
         # Set y-ticks to specific values for each subplot
-        axs[row, col].set_yticks([-0.3, -0.28, -0.26, -0.24, -0.22, -0.20, -0.18, -0.16, -0.14, -0.12])
+        axs[row, col].set_yticks(y_ticks)
         axs[row, col].set_xticks(x_ticks)
         axs[row, col].set_xlabel('Simulation Step', fontsize=12)
         axs[row, col].set_ylabel('Loss', fontsize=12)
@@ -85,7 +92,7 @@ def plot_loss_2(lists, xmax):
     plt.tight_layout()
     plt.savefig(f"plots/all_loss.png")
     
-lists, xmax = read_statistics_file()
+lists, xmax, xmin= read_statistics_file()
 
 # plot_loss(lists, xmax)
-plot_loss_2(lists, xmax)
+plot_loss_2(lists, xmin)

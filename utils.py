@@ -9,6 +9,33 @@
 
 """
 import os
+import math
+import random
+
+# -----------------------------------------------------------------
+
+"""
+    GLOBAL VARIABLES
+"""
+
+# -----------------------------------------------------------------
+x_offset = 0.1 
+ground_height = 0.1
+n_sin_waves = 10
+
+# -----------------------------------------------------------------
+
+"""
+    Files helper functions.
+"""
+
+# -----------------------------------------------------------------
+
+def create_video(experiment_name):
+    os.system("rm simulation.mp4")
+    os.system(f" ffmpeg -i images/robot_0/image_%d.png recordings/simulation_{experiment_name}.mp4")
+    
+# -----------------------------------------------------------------
 
 # Helper function to set indices of files back in range of 0...n_robot_population
 def re_order_files(directory, attr):
@@ -53,6 +80,35 @@ def rename_dir(directory):
         if dir_name != new_dir_ename:
             os.rename(old_path, new_path)
             print(f"Renamed dir '{dir_name}' to '{new_dir_ename}'")
+
+# -----------------------------------------------------------------
+
+def remove_files_before_simulation():
+    os.system("rm population/*.txt")
+    os.system("rm fitness/*.txt")
+    os.system("rm trackers_prob/*.txt")
+    os.system("rm trackers_loss/*.txt")
+    os.system("rm controller/*.npz")
+    os.system(f"rm stats/loss.txt")
+    os.system("rm -rf images/*")
+
+# -----------------------------------------------------------------
+
+def update_files():
+    re_order_files("population", "robot")
+    re_order_files("fitness", "loss")
+    re_order_files("trackers_prob", "prob")
+    re_order_files("trackers_loss", "loss")
+    re_order_files("controller", "weights")
+    rename_dir("images")
+    
+# -----------------------------------------------------------------
+
+"""
+    VALUES: Loss & Probabilities for mutation actions helper functions
+"""
+
+# -----------------------------------------------------------------
 
 def track_values(robot_idx):
     """
@@ -149,26 +205,27 @@ def update_probabilities(n_robot_population, simulation_step):
                 probabilities = [float(token) for token in probabilities]
                 
                 # TODO: Could include a delta that helps updating
+                # TODO: Never removing objects prob -> Fix it
                 # Update probabilities
                 if last_loss > previous_loss: # Worse loss than prev. 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.35)
-                    probabilities[1] = max(0.0, probabilities[1] - 0.1)
-                    probabilities[2] = max(0.0, probabilities[2] - 0.25)
+                    probabilities[0] = min(1.0, probabilities[0] + 0.30)
+                    probabilities[1] = min(1.0, probabilities[1] + 0.15)
+                    probabilities[2] = max(0.0, probabilities[2] - 0.45)
                                     
                 elif last_loss > (previous_loss + 0.5): 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.8)
-                    probabilities[1] = max(0.0, probabilities[1] - 0.4)
-                    probabilities[2] = max(0.0, probabilities[2] - 0.4)
+                    probabilities[0] = min(1.0, probabilities[0] + 0.40)
+                    probabilities[1] = min(1.0, probabilities[1] + 0.35)
+                    probabilities[2] = max(0.0, probabilities[2] - 0.75)
                                         
                 elif last_loss < (previous_loss - 0.5):  # New loss is way smaller than previous -> Increase doing nothing
-                    probabilities[0] = max(0.0, probabilities[0] - 0.35)
+                    probabilities[0] = max(0.0, probabilities[0] - 0.40)
                     probabilities[1] = max(0.0, probabilities[1] - 0.35)
-                    probabilities[2] = min(1.0, probabilities[2] + 0.7)
+                    probabilities[2] = min(1.0, probabilities[2] + 0.75)
                     
                 else: # Increase chance of adding or doing nothing.
-                    probabilities[0] = max(0.0, probabilities[0] - 0.2)
+                    probabilities[0] = max(0.0, probabilities[0] - 0.3)
                     probabilities[1] = max(0.0, probabilities[1] - 0.3)
-                    probabilities[2] = min(1.0, probabilities[2] + 0.5)
+                    probabilities[2] = min(1.0, probabilities[2] + 0.6)
 
                 # Normalize the values
                 total = probabilities[0] + probabilities[1]+ probabilities[2]
@@ -177,9 +234,9 @@ def update_probabilities(n_robot_population, simulation_step):
                 nothing_prob = probabilities[2] / total
                 
         else:
-            add_prob = 0.34
-            remove_prob = 0.33
-            nothing_prob = 0.33
+            add_prob = 0.25
+            remove_prob = 0.25
+            nothing_prob = 0.50
             
         # Save to file
         with open(f"trackers_prob/prob_{robot_idx}.txt", 'a+') as file:
@@ -220,4 +277,91 @@ def get_probabilities(robot_idx):
         nothing_prob = probabilities[2]
         
     return add_prob, remove_prob, nothing_prob
+# -----------------------------------------------------------------
+
+"""
+    OBJECT and SPRING GENERATION FUNCTIONS
+"""
+
+# -----------------------------------------------------------------
+
+def generate_obj_positions(n_objects):
+    """
+        Definition
+        -----------
+            Generates an object based on x, y coordinates.
+            
+        Parameters
+        -----------
+            - n_objects (int): number of objects to be generated
+            
+        Returns
+        -----------
+            - new_obj_pos (list): List of newly created objects for a given robot.
+
+    """
+    
+    new_obj_pos = []
+    for _ in range(n_objects):
+        
+        # Generate random x_pos and y_pos
+        obj_x_pos = random.uniform(0, 0.25)
+        obj_y_pos = random.uniform(0, 0.3)
+        
+        # Check there is no object in same x and y.
+        for created_obj in new_obj_pos:
+            x, y = created_obj
+            
+            # Add an arbitrary offset to undraw
+            if x == obj_x_pos and y == obj_y_pos:
+                obj_x_pos += 0.05
+                obj_y_pos += 0.05
+        
+        # Add object
+        new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
+        
+    return new_obj_pos
+
+# -----------------------------------------------------------------
+
+def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
+    """
+        Definition
+        -----------
+            Create a spring between objects at index i-th and j-th in the list startingObjectPositions. 
+            Can be either motorized or not. Appends to list of springs.
+            
+        Parameters
+        -----------
+            - springs_robot (list): list of information of the generated robot.
+            - i (int): object at index i-th in startingObjectPositions
+            - j (int): object at index j-th in startingObjectPositions
+            - is_motor (int): if the spring is motorized or not.
+            - startingObjectPositions (list): List of objects of the specific robot.
+            
+        Returns
+        -----------
+            None
+    """
+    
+    object_a = startingObjectPositions[i]
+    object_b = startingObjectPositions[j]
+
+    # Get x and y coordinates of objects to calculate distance
+    x_distanceAB = object_a[0] - object_b[0]
+    y_distanceAB = object_a[1] - object_b[1]
+
+    # Pythagorean Distance.
+    # Springs need a "at rest"-length that is the length that "likes" to stay at.
+    distance_A_to_B = math.sqrt(x_distanceAB**2 + y_distanceAB**2)
+    resting_length = distance_A_to_B
+    
+    springs_robot.append([i, j, resting_length, is_motor])
+
+# -----------------------------------------------------------------
+
+def n_sensors(n_objects):
+    return n_sin_waves + 4 * n_objects + 2
+
+# -----------------------------------------------------------------
 
