@@ -9,6 +9,7 @@
 
 """
 import matplotlib.pyplot as plt
+import math
 
 def read_statistics_file():
     with open(f"stats/loss.txt", 'r') as file:
@@ -53,7 +54,11 @@ def plot_loss(lists, xmax, xmin):
 def plot_loss_2(lists, xmin):
     # Create a 5x4 grid of subplots
     # TODO: Create grid of plots based on how many are in the list
-    fig, axs = plt.subplots(5, 6, figsize=(40, 20))
+    # fig, axs = plt.subplots(5, 6, figsize=(40, 20))
+    num_values = len(lists) + 1
+    grid_size = math.ceil(math.sqrt(num_values))
+    fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16, 12))
+
 
     x_ticks = []
     for i in range(0, len(lists)):
@@ -63,12 +68,12 @@ def plot_loss_2(lists, xmin):
     current = xmin
     while current <= 0:
         y_ticks.append(round(current, 2))  # Round to 2 decimal places
-        current += 0.03
+        current += 0.3
         
     # Plot each list in a subplot
     for idx, lst in enumerate(lists):
-        row = idx // 6
-        col = idx % 6
+        row = idx // grid_size
+        col = idx % grid_size
         x = range(len(lst))
         
         # Plot dots at specific values
@@ -85,8 +90,16 @@ def plot_loss_2(lists, xmin):
             axs[row, col].set_title(f'Robot eliminated at step {idx}', fontsize=12)
         else:
             axs[row, col].set_title(f'Fittest Robot', fontsize=12)
-        
+       
+    # Hide non-used arrays 
+    for i in range(num_values-1, grid_size**2 -1):
+        row = i // grid_size
+        col = i % grid_size
+        print(row, col)
+        if row < axs.shape[0] and col < axs.shape[1]:
+            axs[row, col].axis('off')
 
+    
     # Add labels and show plot
     fig.suptitle('All loss trajectories', fontsize=24)
     plt.tight_layout()

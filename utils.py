@@ -31,9 +31,15 @@ n_sin_waves = 10
 
 # -----------------------------------------------------------------
 
-def create_video(experiment_name):
+def create_video(experiment_name, type_exp):
     os.system("rm simulation.mp4")
-    os.system(f" ffmpeg -i images/robot_0/image_%d.png recordings/simulation_{experiment_name}.mp4")
+    
+    if type_exp == "fit":
+        os.system(f" ffmpeg -i images/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
+    else:
+        os.system(f" ffmpeg -i img_base/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
+
+        
     
 # -----------------------------------------------------------------
 
@@ -103,7 +109,7 @@ def update_files():
     rename_dir("images")
     
 # -----------------------------------------------------------------
-
+    
 """
     VALUES: Loss & Probabilities for mutation actions helper functions
 """
@@ -212,12 +218,12 @@ def update_probabilities(n_robot_population, simulation_step):
                     probabilities[1] = min(1.0, probabilities[1] + 0.15)
                     probabilities[2] = max(0.0, probabilities[2] - 0.45)
                                     
-                elif last_loss > (previous_loss + 0.5): 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.40)
-                    probabilities[1] = min(1.0, probabilities[1] + 0.35)
+                elif last_loss > (previous_loss + 0.35): 
+                    probabilities[0] = min(1.0, probabilities[0] + 0.50)
+                    probabilities[1] = min(1.0, probabilities[1] + 0.30)
                     probabilities[2] = max(0.0, probabilities[2] - 0.75)
                                         
-                elif last_loss < (previous_loss - 0.5):  # New loss is way smaller than previous -> Increase doing nothing
+                elif last_loss < (previous_loss - 0.35):  # New loss is way smaller than previous -> Increase doing nothing
                     probabilities[0] = max(0.0, probabilities[0] - 0.40)
                     probabilities[1] = max(0.0, probabilities[1] - 0.35)
                     probabilities[2] = min(1.0, probabilities[2] + 0.75)
@@ -228,7 +234,7 @@ def update_probabilities(n_robot_population, simulation_step):
                     probabilities[2] = min(1.0, probabilities[2] + 0.6)
 
                 # Normalize the values
-                total = probabilities[0] + probabilities[1]+ probabilities[2]
+                total = probabilities[0] + probabilities[1] + probabilities[2]
                 add_prob = probabilities[0] / total
                 remove_prob = probabilities[1] / total
                 nothing_prob = probabilities[2] / total
@@ -305,8 +311,8 @@ def generate_obj_positions(n_objects):
     for _ in range(n_objects):
         
         # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0, 0.25)
-        obj_y_pos = random.uniform(0, 0.3)
+        obj_x_pos = random.uniform(0.05, 0.22)
+        obj_y_pos = random.uniform(ground_height+0.025, 0.3)
         
         # Check there is no object in same x and y.
         for created_obj in new_obj_pos:
@@ -314,8 +320,8 @@ def generate_obj_positions(n_objects):
             
             # Add an arbitrary offset to undraw
             if x == obj_x_pos and y == obj_y_pos:
-                obj_x_pos += 0.05
-                obj_y_pos += 0.05
+                obj_x_pos += 0.06
+                obj_y_pos += 0.06
         
         # Add object
         new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])
@@ -359,6 +365,34 @@ def create_spring(springs_robot, i, j, is_motor, startingObjectPositions):
     springs_robot.append([i, j, resting_length, is_motor])
 
 # -----------------------------------------------------------------
+
+def get_last_obj_index(lines):
+    
+    # Gather all ith, jth
+    largest_idx = 0
+    current_springs = []
+    for line in lines:
+
+        tokens = line.split()
+        
+        # Get current springs to update after adding object
+        indiv_spring = []
+        for i, num in enumerate(tokens):
+            if i == 2:  # Check if it's the third number (0-indexed)
+                indiv_spring.append(float(num))
+            else:
+                indiv_spring.append(int(num))
+        current_springs.append(indiv_spring)
+        
+        # Extract the second tokens as integers. Need to check what's largest index
+        if len(tokens) >= 2:
+            second = int(tokens[1])
+            
+            # Update to check what's the largest 
+            if second > largest_idx:
+                largest_idx = second
+    
+    return largest_idx, current_springs
 
 def n_sensors(n_objects):
     return n_sin_waves + 4 * n_objects + 2
