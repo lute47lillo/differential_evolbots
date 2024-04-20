@@ -21,13 +21,13 @@ stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.89
 learning_rate = 1
-piston_force = 0.07 # Force applied to the actuations. Bigger, piston force, less acrobatic
+piston_force = 0.085 # Force applied to the actuations. Bigger, piston force, less acrobatic
 x_offset = 0.1 # How far from left screen robot starts
 damping = 0.75 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
-n_robot_population = 5
-n_optimization_steps = 2
+n_robot_population = 10
+n_optimization_steps = 10
 initial_robot_population = n_robot_population
 
 """
@@ -58,10 +58,10 @@ def simulate_robot(robot_index):
     
     # First object is always given.
     startingObjectPositions.append([x_offset, ground_height+0.02])
-    startingObjectPositions.append([x_offset+0.2, ground_height+0.02])
+    startingObjectPositions.append([x_offset+0.25, ground_height+0.02])
     
-    # TODO: How many more are created? Should I start at least with 3 minimum?
-    total_objects = random.randint(1, 5)
+    # TODO: How many more are created? Should I start at least with 3 minimum? Make 4 maximum?
+    total_objects = random.randint(1, 4)
     
     # Generate the objects
     startingObjectPositions += utils.generate_obj_positions(total_objects)
@@ -122,16 +122,12 @@ def Compute_loss():
     
     # Focus on position of the objects to determine loss fn. Arbitrary choice
     # Second component of zeroth object. Loss = Height of 0th objects at last time_step [1]
-    # print(r.positions[r.max_steps-1, 0][0], r.positions[r.max_steps-1, 1][0])
     
-    # TODO Might need to be - prev position at prev time-step?
-    loss[None] -= (1.5 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
-                + (1.5 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
-                + (0.8 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
-                + (0.8 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
-    
-    # (r.positions[r.max_steps-1, 1][1] - 0.1)
-    # (0.8 * (r.goal[None][0] - r.center[r.max_steps-1][0]))
+    # TODO: Try with negative final position
+    loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
+                + (1.2 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
+                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
+                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
     
 # -------------------------------------------------------------
 
@@ -253,7 +249,7 @@ def Initialize_Neural_Network(r):
     # Initialize sensor to hidden neurons
     for i in range(r.n_hidden_neurons):
         for j in range(utils.n_sensors(r.n_objects)):
-            r.weightsSH[i,j] = np.random.randn() * 0.2 - 0.1
+            r.weightsSH[i,j] = np.random.randn() * 0.3 - 0.1
     
     # Init bias for hidden neurons
     for i in range(r.n_hidden_neurons):
@@ -262,7 +258,7 @@ def Initialize_Neural_Network(r):
     # Init weights
     for i in range(r.n_springs):
         for j in range(r.n_hidden_neurons):
-            r.weightsHM[i,j] = np.random.randn() * 0.2 - 0.1
+            r.weightsHM[i,j] = np.random.randn() * 0.3 - 0.1
             
 # -------------------------------------------------------------
 
@@ -458,7 +454,6 @@ def tune_robots_brain(r):
     
     return prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden
 
-
 # -------------------------------------------------------------
 
 # TODO: pass loss as parameter and move function to utils
@@ -475,8 +470,7 @@ def save_fitness_losses(r, robot_index):
         file.write(save_loss)
         file.close()        
         
-# TODO: Save controllers only if new loss is better than previous
-def save_controller_weights(r, robot_index, sim_step, n_optimization_steps, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden):
+def save_controller_weights(r, robot_index, sim_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden):
         
     # Get new optimized weights.
     weightsSH_arr = r.weightsSH.to_numpy()
@@ -602,24 +596,6 @@ def add_object(r, robot_index, is_spring_null):
             
         file.writelines(all_lines)
 
-def check_object_index(lines, object_index_remove):
-    
-    new_lines = []
-    for line in lines:
-        
-        # Split the line into tokens
-        tokens = line.split()
-        
-        # Extract the first two tokens as integers
-        if len(tokens) >= 2:
-            first = int(tokens[0])
-            second = int(tokens[1])
-            
-            if first != object_index_remove and second != object_index_remove:
-                new_lines.append(line)
-    
-    return new_lines
-
 def remove_object(r, robot_idx):
     
     # TODO: As simulation runs increase, number of possible objects to be removed increases as well.
@@ -629,7 +605,7 @@ def remove_object(r, robot_idx):
     
     # Check that there is at least 1 spring at all moments
     if r.n_springs <= 1:
-        add_object(robot_idx, True)
+        add_object(r, robot_idx, True)
         return
     
     with open(f"population/robot_{robot_idx}.txt", 'r') as file:
@@ -646,7 +622,7 @@ def remove_object(r, robot_idx):
         if original_obj_size <= 2:
             
             # Mutate by adding object
-            add_object(robot_idx, True)
+            add_object(r, robot_idx, True)
             return
         
         # Get springs from file
@@ -665,12 +641,12 @@ def remove_object(r, robot_idx):
                 r.startingObjectPositions.pop(object_index_remove)
             
                 # Remove links containing that index
-                spring_lines = check_object_index(spring_lines, object_index_remove)
+                spring_lines = utils.check_object_index(spring_lines, object_index_remove)
                 
             # Check there is still a robot spring
             if len(spring_lines) == 0:
                 print(f"WARNING: Deleting all springs... Add Object to robot {robot_idx}")
-                add_object(robot_idx, True)
+                add_object(r, robot_idx, True)
                 
                 # Need to re-set spring lines
                 temp_spring_lines = file.readlines()
@@ -811,7 +787,7 @@ if __name__ == "__main__":
                     save_fitness_losses(r, robot_idx)
                 
                 # Save optimized steps Across simulation runs.
-                save_controller_weights(r, robot_idx, simulation_step, n_optimization_steps, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
+                save_controller_weights(r, robot_idx, simulation_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
                 
         # Eliminate the lowest-ranked individual by fitness
         idx_robot_delete = eliminate_individual(n_robot_population)
@@ -846,5 +822,5 @@ if __name__ == "__main__":
             Draw(r, max_steps, 0)
             
             # Create video
-            experiment_name = "X_1"
+            experiment_name = "X_3"
             utils.create_video(experiment_name, "fit")

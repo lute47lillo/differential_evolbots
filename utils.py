@@ -39,8 +39,6 @@ def create_video(experiment_name, type_exp):
     else:
         os.system(f" ffmpeg -i img_base/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
 
-        
-    
 # -----------------------------------------------------------------
 
 # Helper function to set indices of files back in range of 0...n_robot_population
@@ -75,6 +73,8 @@ def rename_dir(directory):
     
     # Sort the files by their index in ascending order
     dirs.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+    
+    print(dirs)
     
     # Loop through the files and rename them
     for idx, dir_name in enumerate(dirs):
@@ -214,13 +214,13 @@ def update_probabilities(n_robot_population, simulation_step):
                 # TODO: Never removing objects prob -> Fix it
                 # Update probabilities
                 if last_loss > previous_loss: # Worse loss than prev. 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.30)
-                    probabilities[1] = min(1.0, probabilities[1] + 0.15)
+                    probabilities[0] = min(1.0, probabilities[0] + 0.25)
+                    probabilities[1] = min(1.0, probabilities[1] + 0.20)
                     probabilities[2] = max(0.0, probabilities[2] - 0.45)
                                     
                 elif last_loss > (previous_loss + 0.35): 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.50)
-                    probabilities[1] = min(1.0, probabilities[1] + 0.30)
+                    probabilities[0] = min(1.0, probabilities[0] + 0.40)
+                    probabilities[1] = min(1.0, probabilities[1] + 0.35)
                     probabilities[2] = max(0.0, probabilities[2] - 0.75)
                                         
                 elif last_loss < (previous_loss - 0.35):  # New loss is way smaller than previous -> Increase doing nothing
@@ -311,8 +311,8 @@ def generate_obj_positions(n_objects):
     for _ in range(n_objects):
         
         # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0.05, 0.22)
-        obj_y_pos = random.uniform(ground_height+0.025, 0.3)
+        obj_x_pos = random.uniform(0.05, 0.25)
+        obj_y_pos = random.uniform(ground_height+0.025, 0.35)
         
         # Check there is no object in same x and y.
         for created_obj in new_obj_pos:
@@ -393,6 +393,24 @@ def get_last_obj_index(lines):
                 largest_idx = second
     
     return largest_idx, current_springs
+
+def check_object_index(lines, object_index_remove):
+    
+    new_lines = []
+    for line in lines:
+        
+        # Split the line into tokens
+        tokens = line.split()
+        
+        # Extract the first two tokens as integers
+        if len(tokens) >= 2:
+            first = int(tokens[0])
+            second = int(tokens[1])
+            
+            if first != object_index_remove and second != object_index_remove:
+                new_lines.append(line)
+    
+    return new_lines
 
 def n_sensors(n_objects):
     return n_sin_waves + 4 * n_objects + 2

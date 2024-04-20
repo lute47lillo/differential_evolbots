@@ -95,17 +95,18 @@ def read_objects_springs_fit_robot(robot_index):
 @tai.kernel
 def compute_loss_baseline():
     
-    loss[None] -= (1.5 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
-                + (1.5 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
-                + (0.8 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
-                + (0.8 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
+    loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
+                + (1.2 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
+                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
+                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
 
-
+# TODO: Check with the other loss (using -)
 """
     Init Simulation
 """
+# TODO I do not think this is what you want to do
 os.system("rm -rf img_base/*")
-copy_init_robot_files()
+# copy_init_robot_files()
 
 # Read springs and objects
 springs, startingObjectPositions = read_objects_springs_fit_robot(0)
@@ -113,14 +114,11 @@ springs, startingObjectPositions = read_objects_springs_fit_robot(0)
 # Create Robot
 r = Robot(springs, startingObjectPositions, max_steps)
     
-# TODO: There has to be a more efficient way to do this, than to have 2 different losses being calculated.
 # Create loss for that robot
-    # 0-D tensor
 loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) 
 tai.root.lazy_grad() 
 
-simulation_step = 0
-for opt_step in range(190):        
+for opt_step in range(90):        
         
     if opt_step == 0:
         sim.Initialize_Neural_Network(r)
@@ -149,12 +147,12 @@ for opt_step in range(190):
     # Fine-tune the brain of the robot
     prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden = sim.tune_robots_brain(r)
     
+    if opt_step == 0:
+        os.system(f"rm img_base/robot_0/*.png")
+        draw_fittest_robot(r, 0, 0)
+    
     # TODO: Save the fitness loss periodically, to compare later
     # sim.save_fitness_losses(0)
-    
-    # Save optimized steps Across simulation runs.
-    sim.save_controller_weights(r, 0, simulation_step, 190, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
-    simulation_step += 1
-    
+
 draw_fittest_robot(r, 200, 0)
-utils.create_video("RE_1", "re")
+utils.create_video("RE_3", "re")

@@ -27,7 +27,7 @@ def read_statistics_file():
         lists.append(values)
 
     # Find the length of the longest list
-    xmax = max(len(lst) for lst in lists)
+    xmax = max(max(lst) for lst in lists)
     xmin = min(min(lst) for lst in lists)
     
     return lists, xmax, xmin
@@ -51,7 +51,7 @@ def plot_loss(lists, xmax, xmin):
     plt.savefig(f"plots/loss.png")
     # plt.show()
     
-def plot_loss_2(lists, xmin):
+def plot_loss_2(lists, xmin, xmax):
     # Create a 5x4 grid of subplots
     # TODO: Create grid of plots based on how many are in the list
     # fig, axs = plt.subplots(5, 6, figsize=(40, 20))
@@ -66,9 +66,11 @@ def plot_loss_2(lists, xmin):
    
     y_ticks = []
     current = xmin
-    while current <= 0:
+    while current <= xmax:
+        diff = xmax - xmin
+        ticks_step = round(float(diff / 10), 2)
         y_ticks.append(round(current, 2))  # Round to 2 decimal places
-        current += 0.3
+        current += ticks_step
         
     # Plot each list in a subplot
     for idx, lst in enumerate(lists):
@@ -95,7 +97,6 @@ def plot_loss_2(lists, xmin):
     for i in range(num_values-1, grid_size**2 -1):
         row = i // grid_size
         col = i % grid_size
-        print(row, col)
         if row < axs.shape[0] and col < axs.shape[1]:
             axs[row, col].axis('off')
 
@@ -103,9 +104,10 @@ def plot_loss_2(lists, xmin):
     # Add labels and show plot
     fig.suptitle('All loss trajectories', fontsize=24)
     plt.tight_layout()
-    plt.savefig(f"plots/all_loss.png")
+    plt.savefig(f"plots/exp3_loss_10r_10o.png")
     
 lists, xmax, xmin= read_statistics_file()
 
+
 # plot_loss(lists, xmax)
-plot_loss_2(lists, xmin)
+plot_loss_2(lists, xmin, xmax)
