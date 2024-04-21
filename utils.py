@@ -214,14 +214,14 @@ def update_probabilities(n_robot_population, simulation_step):
                 # TODO: Never removing objects prob -> Fix it
                 # Update probabilities
                 if last_loss > previous_loss: # Worse loss than prev. 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.25)
+                    probabilities[0] = min(1.0, probabilities[0] + 0.40)
                     probabilities[1] = min(1.0, probabilities[1] + 0.20)
-                    probabilities[2] = max(0.0, probabilities[2] - 0.45)
+                    probabilities[2] = max(0.0, probabilities[2] - 0.60)
                                     
                 elif last_loss > (previous_loss + 0.35): 
-                    probabilities[0] = min(1.0, probabilities[0] + 0.40)
+                    probabilities[0] = min(1.0, probabilities[0] + 0.45)
                     probabilities[1] = min(1.0, probabilities[1] + 0.35)
-                    probabilities[2] = max(0.0, probabilities[2] - 0.75)
+                    probabilities[2] = max(0.0, probabilities[2] - 0.80)
                                         
                 elif last_loss < (previous_loss - 0.35):  # New loss is way smaller than previous -> Increase doing nothing
                     probabilities[0] = max(0.0, probabilities[0] - 0.40)
@@ -229,9 +229,9 @@ def update_probabilities(n_robot_population, simulation_step):
                     probabilities[2] = min(1.0, probabilities[2] + 0.75)
                     
                 else: # Increase chance of adding or doing nothing.
-                    probabilities[0] = max(0.0, probabilities[0] - 0.3)
+                    probabilities[0] = max(0.0, probabilities[0] - 0.2)
                     probabilities[1] = max(0.0, probabilities[1] - 0.3)
-                    probabilities[2] = min(1.0, probabilities[2] + 0.6)
+                    probabilities[2] = min(1.0, probabilities[2] + 0.5)
 
                 # Normalize the values
                 total = probabilities[0] + probabilities[1] + probabilities[2]
@@ -311,7 +311,7 @@ def generate_obj_positions(n_objects):
     for _ in range(n_objects):
         
         # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0.05, 0.25)
+        obj_x_pos = random.uniform(0.05, 0.3)
         obj_y_pos = random.uniform(ground_height+0.025, 0.35)
         
         # Check there is no object in same x and y.
@@ -320,8 +320,8 @@ def generate_obj_positions(n_objects):
             
             # Add an arbitrary offset to undraw
             if x == obj_x_pos and y == obj_y_pos:
-                obj_x_pos += 0.06
-                obj_y_pos += 0.06
+                obj_x_pos += 0.02
+                obj_y_pos += 0.02
         
         # Add object
         new_obj_pos.append([x_offset + obj_x_pos, ground_height + obj_y_pos])

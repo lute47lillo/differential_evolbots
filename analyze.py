@@ -56,7 +56,8 @@ def plot_loss_2(lists, xmin, xmax):
     # TODO: Create grid of plots based on how many are in the list
     # fig, axs = plt.subplots(5, 6, figsize=(40, 20))
     num_values = len(lists) + 1
-    grid_size = math.ceil(math.sqrt(num_values))
+    grid_size = math.ceil(math.sqrt(num_values)) + 1
+    print(grid_size)
     fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16, 12))
 
 
@@ -77,6 +78,7 @@ def plot_loss_2(lists, xmin, xmax):
         row = idx // grid_size
         col = idx % grid_size
         x = range(len(lst))
+        print(row, col)
         
         # Plot dots at specific values
         axs[row, col].plot(x, lst, color='red')
@@ -104,7 +106,7 @@ def plot_loss_2(lists, xmin, xmax):
     # Add labels and show plot
     fig.suptitle('All loss trajectories', fontsize=24)
     plt.tight_layout()
-    plt.savefig(f"plots/exp3_loss_10r_10o.png")
+    plt.savefig(f"plots/exp5_loss_10r_10o.png")
     
 lists, xmax, xmin= read_statistics_file()
 

@@ -118,7 +118,7 @@ r = Robot(springs, startingObjectPositions, max_steps)
 loss = tai.field(dtype=tai.f32, shape=(), needs_grad=True) 
 tai.root.lazy_grad() 
 
-for opt_step in range(90):        
+for opt_step in range(140):        
         
     if opt_step == 0:
         sim.Initialize_Neural_Network(r)
@@ -151,8 +151,14 @@ for opt_step in range(90):
         os.system(f"rm img_base/robot_0/*.png")
         draw_fittest_robot(r, 0, 0)
     
-    # TODO: Save the fitness loss periodically, to compare later
-    # sim.save_fitness_losses(0)
+    if opt_step % 10 == 0:
+        # TODO: save the weights if better loss
+        print("WIP")
+        
+        # TODO: Save the fitness loss periodically, to compare later. So Ideally there will be 15 losses saved
+        # sim.save_fitness_losses(0)
+        
+    
 
 draw_fittest_robot(r, 200, 0)
-utils.create_video("RE_3", "re")
+utils.create_video("RE_7", "re")

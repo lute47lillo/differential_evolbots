@@ -8,6 +8,7 @@ import random
 from robot import Robot
 import shutil
 import utils
+import time
 
 # -------------------------------------------------------------
 
@@ -21,12 +22,12 @@ stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.89
 learning_rate = 1
-piston_force = 0.085 # Force applied to the actuations. Bigger, piston force, less acrobatic
+piston_force = 0.07 # Force applied to the actuations. Bigger, piston force, less acrobatic
 x_offset = 0.1 # How far from left screen robot starts
-damping = 0.75 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.65 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
-n_robot_population = 10
+n_robot_population = 15
 n_optimization_steps = 10
 initial_robot_population = n_robot_population
 
@@ -58,7 +59,7 @@ def simulate_robot(robot_index):
     
     # First object is always given.
     startingObjectPositions.append([x_offset, ground_height+0.02])
-    startingObjectPositions.append([x_offset+0.25, ground_height+0.02])
+    startingObjectPositions.append([x_offset+0.2, ground_height+0.02])
     
     # TODO: How many more are created? Should I start at least with 3 minimum? Make 4 maximum?
     total_objects = random.randint(1, 4)
@@ -210,12 +211,12 @@ def Initialize(r):
         r.spring_actuation[spring_idx]        = s[3]
         
     # Reset Positions (x,y) and velocities
-    # for i in range(1, r.max_steps):
-    #     for j in range(r.n_objects):
-    #         r.positions[i,j][0] = 0.0
-    #         r.positions[i,j][1] = 0.0
-    #         r.velocities[i,j][0] = 0.0
-    #         r.velocities[i,j][1] = 0.0
+    for i in range(1, r.max_steps):
+        for j in range(r.n_objects):
+            r.positions[i,j][0] = 0.0
+            r.positions[i,j][1] = 0.0
+            r.velocities[i,j][0] = 0.0
+            r.velocities[i,j][1] = 0.0
     
     for i in range(1, r.max_steps):
         for j in range(r.n_springs):
@@ -229,9 +230,9 @@ def Initialize(r):
             r.spring_forces_on_objects[i,j][1] = 0.0 
     
     # Reset values
-    # for i in range(1, r.max_steps):
-    #     for j in range(r.n_hidden_neurons):
-    #         r.hidden[i,j] = 0.0
+    for i in range(1, r.max_steps):
+        for j in range(r.n_hidden_neurons):
+            r.hidden[i,j] = 0.0
             
     # Reset values of motor neurons
     for i in range(1, r.max_steps):
@@ -655,7 +656,7 @@ def remove_object(r, robot_idx):
                 # Re-set objects
                 old_obj_pos = eval(all_lines[0])
                 r.startingObjectPositions = old_obj_pos
-                # print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
+                print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
                    
         # Rewrite
         all_lines[0] = str(r.startingObjectPositions) + '\n'
@@ -677,7 +678,7 @@ def remove_object(r, robot_idx):
             
     r.springs = new_springs_robot
     r.n_springs = len(r.springs)
-    # print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
+    print(f"Robot {robot_idx}, total springs {r.n_springs}, {len(spring_lines)}")
 
 def mutate_population(r, n_robot_population):
 
@@ -727,7 +728,7 @@ if __name__ == "__main__":
     # Create population of robots
     springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
-    for simulation_step in range(initial_robot_population-1):
+    for simulation_step in range(initial_robot_population):
         
         print(f"\nSIMULATION RUN {simulation_step+1}")
         robot_drawing = []
@@ -772,7 +773,7 @@ if __name__ == "__main__":
                     else:
                         r.loss[None] = float(loss[None])
                     
-                print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {loss[None]}")
+                print(f"Robot {robot_idx} - Opt Step {opt_step}. Loss: {r.loss[None]}")
                 
                 # Fine-tune the brain of the robot
                 prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden = tune_robots_brain(r)
@@ -788,21 +789,21 @@ if __name__ == "__main__":
                 
                 # Save optimized steps Across simulation runs.
                 save_controller_weights(r, robot_idx, simulation_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
-                
-        # Eliminate the lowest-ranked individual by fitness
-        idx_robot_delete = eliminate_individual(n_robot_population)
-        
-        # Re-order file indices for simplicity
-        utils.update_files()
-                
+             
         # Set new number of individuals in population
         n_robot_population -= 1
-        
-        # Delete from list of springs and objects
-        springs_population.pop(idx_robot_delete)
-        startingObjectPositions_population.pop(idx_robot_delete)
             
-        if n_robot_population != 1:
+        if n_robot_population != 0:
+            
+            # Eliminate the lowest-ranked individual by fitness
+            idx_robot_delete = eliminate_individual(n_robot_population)
+            
+            # Re-order file indices for simplicity
+            utils.update_files()
+            
+            # Delete from list of springs and objects
+            springs_population.pop(idx_robot_delete)
+            startingObjectPositions_population.pop(idx_robot_delete)
             
             # Update Action probabilities
             utils.update_probabilities(robot_idx, simulation_step)
@@ -812,15 +813,20 @@ if __name__ == "__main__":
             
         else:
             print(f"\nEND SIMULATION")
+            
+            # Re-read the fittest robot objects and springs
+            # set_fittest_robot_draw(0)
+            time.sleep(2)
+            
+            # Debug check
             print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
             
-            # Track values for analyzing
-            set_fittest_robot_draw(0)
+            # Track values for analyzing and plotting
             utils.track_values(0)
             
-            # Draw final robot
+            # Draw final robot. 
             Draw(r, max_steps, 0)
             
             # Create video
-            experiment_name = "X_3"
+            experiment_name = "X_7"
             utils.create_video(experiment_name, "fit")
