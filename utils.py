@@ -11,6 +11,8 @@
 import os
 import math
 import random
+import shutil
+import argparse
 
 # -----------------------------------------------------------------
 
@@ -86,6 +88,37 @@ def rename_dir(directory):
         if dir_name != new_dir_ename:
             os.rename(old_path, new_path)
             print(f"Renamed dir '{dir_name}' to '{new_dir_ename}'")
+            
+def copy_init_robot_files():
+    """
+        **DEPRECATED**
+        --------------
+        
+        Definition
+        -----------
+            Copy images of the fittest robot at population init. to new directory.
+
+    """
+    # Define the source and destination directories
+    src_dir = 'images/robot_0'
+    dst_dir = 'img_base/robot_0'
+
+    # Create the destination directory if it doesn't exist
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+
+    # Get a list of files in the source directory
+    files = os.listdir(src_dir)
+    
+    # Copy the first 200 files to the destination directory
+    for file in files:
+        filename, file_extension = os.path.splitext(file)
+        if filename.startswith('image_') and 200 <= int(filename.split('_')[1]) <= 399:
+            new_filename = 'image_' + str(int(filename.split('_')[1]) - 200)
+            new_file = new_filename + file_extension
+            src_file = os.path.join(src_dir, file)
+            dst_file = os.path.join(dst_dir, new_file)
+            shutil.copyfile(src_file, dst_file)
 
 # -----------------------------------------------------------------
 
@@ -109,7 +142,7 @@ def update_files():
     rename_dir("images")
     
 # -----------------------------------------------------------------
-    
+
 """
     VALUES: Loss & Probabilities for mutation actions helper functions
 """
@@ -144,6 +177,14 @@ def track_values(robot_idx):
         file.writelines(save_line)
         file.close()
 
+def baseline_stat_loss_save(loss_baseline):
+            
+    # Save the losses for the robot and its intial index.
+    with open(f"stats/baseline_loss.txt", 'a+') as file:
+        save_line = str(loss_baseline) + "\n"
+        file.writelines(save_line)
+        file.close()
+        
 def check_last_and_prev_loss(robot_idx):
     """
         Definition
@@ -394,6 +435,8 @@ def get_last_obj_index(lines):
     
     return largest_idx, current_springs
 
+# -----------------------------------------------------------------
+
 def check_object_index(lines, object_index_remove):
     
     new_lines = []
@@ -412,8 +455,72 @@ def check_object_index(lines, object_index_remove):
     
     return new_lines
 
+# -----------------------------------------------------------------
+
 def n_sensors(n_objects):
     return n_sin_waves + 4 * n_objects + 2
 
 # -----------------------------------------------------------------
+
+def read_objects_springs_fit_robot(robot_index):
+    
+    with open(f"population/robot_{robot_index}.txt", 'r') as file:
+            
+            all_lines = file.readlines()
+            
+            # Get object positions
+            start_end_obj = eval(all_lines[0])
+            
+            # Get Springs
+            spring_obj = all_lines[1:]
+            _, spring_obj = get_last_obj_index(spring_obj)
+
+    return spring_obj, start_end_obj
+
+
+"""
+    Parsing arguments helper function.
+"""
+
+def parse_args_baseline():
+    
+    # Create argument parser
+    parser = argparse.ArgumentParser()
+
+    # Add arguments
+    parser.add_argument("--n_pop", type=int, help="Number of robots in the initial population.", required=True)
+    parser.add_argument("--n_opt", type=int, help="Number of optimization steps for controller", required=True)
+    parser.add_argument("--name", type=str, help="Name of the simulation run", required=True)
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Access the argument values
+    n_pop = args.n_pop
+    n_opt = args.n_opt
+    name_experiment = args.name
+    
+    return n_pop, n_opt, name_experiment
+
+def parse_args_simulation():
+    
+    # Create argument parser
+    parser = argparse.ArgumentParser()
+
+    # Add arguments
+    parser.add_argument("--n_pop", type=int, help="Number of robots in the initial population.", required=True)
+    parser.add_argument("--n_opt", type=int, help="Number of optimization steps for controller", required=True)
+    parser.add_argument("--name", type=str, help="Name of the simulation run", required=True)
+    parser.add_argument("--lr", type=float, help="Learning Rate", required=True)
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Access the argument values
+    n_pop = args.n_pop
+    n_opt = args.n_opt
+    name_experiment = args.name
+    learning_rate = args.lr
+    
+    return n_pop, n_opt, name_experiment, learning_rate
 
