@@ -11,6 +11,25 @@
 import matplotlib.pyplot as plt
 import math
 
+# def plot_loss(lists, xmax, xmin):
+    
+#     # Plot each list as a line
+#     for lst in lists:
+#         plt.scatter(range(len(lst)), lst)
+
+#     # Set x-axis limit to the length of the longest list
+#     plt.xlim(-1, xmax)
+#     plt.ylim(-0.3, -0.10)
+
+#     plt.yticks([-0.3, -0.28, -0.26, -0.24, -0.22, -0.20, -0.18, -0.16, -0.14, -0.12])
+#     plt.xticks([0, 5, 10, 15, 20])
+#     # Add labels and show plot
+#     plt.xlabel('Simulation Step')
+#     plt.ylabel('Loss')
+#     plt.title('Values from File')
+#     plt.savefig(f"plots/loss.png")
+#     # plt.show()
+
 def read_statistics_file():
     with open(f"stats/loss.txt", 'r') as file:
         lines = file.readlines()
@@ -30,26 +49,15 @@ def read_statistics_file():
     xmax = max(max(lst) for lst in lists)
     xmin = min(min(lst) for lst in lists)
     
-    return lists, xmax, xmin
-
-def plot_loss(lists, xmax, xmin):
+    fittest_values = lists[-1]
     
-    # Plot each list as a line
-    for lst in lists:
-        plt.scatter(range(len(lst)), lst)
-
-    # Set x-axis limit to the length of the longest list
-    plt.xlim(-1, xmax)
-    plt.ylim(-0.3, -0.10)
-
-    plt.yticks([-0.3, -0.28, -0.26, -0.24, -0.22, -0.20, -0.18, -0.16, -0.14, -0.12])
-    plt.xticks([0, 5, 10, 15, 20])
-    # Add labels and show plot
-    plt.xlabel('Simulation Step')
-    plt.ylabel('Loss')
-    plt.title('Values from File')
-    plt.savefig(f"plots/loss.png")
-    # plt.show()
+    with open(f"stats/baseline_loss.txt", 'r') as file:
+        line = file.readline().rstrip('\n')
+        # values_base = line.strip()[1:-1].split(',')
+        values_base = [float(num) for num in line.strip('[]').split(',')]
+        # values_base = [float(value.strip()) if float(value.strip()) != 100000 else 0 for value in values]
+    
+    return lists, xmax, xmin, fittest_values, values_base
     
 def plot_loss_2(lists, xmin, xmax):
     # Create a 5x4 grid of subplots
@@ -108,8 +116,34 @@ def plot_loss_2(lists, xmin, xmax):
     plt.tight_layout()
     plt.savefig(f"plots/exp5_loss_10r_10o.png")
     
-lists, xmax, xmin= read_statistics_file()
+    
+def plot_base_vs_fit(fit, base, xmax, xmin):
+    
+    x_ticks = []
+    for i in range(0, len(lists)):
+        x_ticks.append(i) 
+   
+    y_ticks = []
+    current = xmin
+    while current <= xmax:
+        diff = xmax - xmin
+        ticks_step = round(float(diff / 10), 2)
+        y_ticks.append(round(current, 2))  # Round to 2 decimal places
+        current += ticks_step
+        
+    # Plot each list as a line
+    plt.plot(range(len(fit)), fit, label="Co-Evolution")
+    plt.plot(range(len(base)), base, label="Controller")
+
+    # Add labels and show plot
+    plt.xlabel('Simulation Step')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Comparison fitness')
+    plt.savefig(f"plots/comparison.png")
 
 
+lists, xmax, xmin, fittest_values, base_values = read_statistics_file()
 # plot_loss(lists, xmax)
-plot_loss_2(lists, xmin, xmax)
+plot_base_vs_fit(fittest_values, base_values, xmax, xmin)
+# plot_loss_2(lists, xmin, xmax)
