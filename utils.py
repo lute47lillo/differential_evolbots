@@ -129,6 +129,7 @@ def remove_files_before_simulation():
     os.system("rm trackers_loss/*.txt")
     os.system("rm controller/*.npz")
     os.system(f"rm stats/loss.txt")
+    os.system(f"rm stats/probs.txt")
     os.system("rm -rf images/*")
 
 # -----------------------------------------------------------------
@@ -154,7 +155,6 @@ def track_values(robot_idx):
         Definition
         -----------
             Tracks loss values of all robots to later be used to plot.
-            TODO: Include mutation action probabilities.
         
         Parameters
         -----------
@@ -174,6 +174,32 @@ def track_values(robot_idx):
     # Save the losses for the robot and its intial index.
     with open(f"stats/loss.txt", 'a+') as file:
         save_line = str(losses) + "\n"
+        file.writelines(save_line)
+        file.close()
+        
+def track_probs_values(robot_idx):
+    """
+        Definition
+        -----------
+            Tracks probabilities to take mutation actions of all robots to later be used to plot.
+        
+        Parameters
+        -----------
+            - robot_idx (int): Number that represents the current robot on which the calculation is being made.
+            
+        Returns
+        -----------
+            None
+    """
+    
+    # Read losses over time independently  
+    with open(f"trackers_prob/prob_{robot_idx}.txt", 'r') as file:
+        lines = file.readlines()
+        probs = [line.split() for line in lines]
+        file.close()
+        
+    with open(f"stats/probs.txt", "a+") as file:
+        save_line = str(probs) + "\n"
         file.writelines(save_line)
         file.close()
 
@@ -236,7 +262,7 @@ def update_probabilities(n_robot_population, simulation_step):
             - nothing_prob (float): Probability of selecting the 'Do nothing' mutation action. 
     """
     
-    for robot_idx in range(n_robot_population):
+    for robot_idx in range(n_robot_population+1):
         
         # Read from file existing objects
         if simulation_step > 0:
@@ -290,7 +316,7 @@ def update_probabilities(n_robot_population, simulation_step):
             save_actions = str(add_prob) + " " + str(remove_prob) + " " + str(nothing_prob) + "\n"
             file.write(save_actions)
             file.close()
-            
+        
     return add_prob, remove_prob, nothing_prob
 
 def get_probabilities(robot_idx):

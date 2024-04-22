@@ -126,6 +126,9 @@ if __name__ == "__main__":
     
             # Save the loss
             loss_tracker.append(r.loss[None])
+        
+        if opt_step == (baseline_opt_steps - 1):
+            loss_tracker.append(r.loss[None])
             
     # Save the loss tracker to analyze and plot.    
     utils.baseline_stat_loss_save(loss_tracker)

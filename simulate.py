@@ -27,8 +27,8 @@ x_offset = 0.1 # How far from left screen robot starts
 damping = 0.65 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
-n_robot_population = 15
-n_optimization_steps = 10
+n_robot_population = 5
+n_optimization_steps = 2
 initial_robot_population = n_robot_population
 
 """
@@ -526,6 +526,7 @@ def eliminate_individual(n_robot_population):
     
     print(f"Eliminating robot {idx_robot_delete}\n")
     utils.track_values(idx_robot_delete)
+    utils.track_probs_values(idx_robot_delete)
     
     # Delete population, fitness and image files
     os.system(f"rm population/robot_{idx_robot_delete}.txt")
@@ -795,6 +796,9 @@ if __name__ == "__main__":
             
         if n_robot_population != 0:
             
+            # Update Action probabilities
+            utils.update_probabilities(robot_idx, simulation_step)
+            
             # Eliminate the lowest-ranked individual by fitness
             idx_robot_delete = eliminate_individual(n_robot_population)
             
@@ -804,9 +808,6 @@ if __name__ == "__main__":
             # Delete from list of springs and objects
             springs_population.pop(idx_robot_delete)
             startingObjectPositions_population.pop(idx_robot_delete)
-            
-            # Update Action probabilities
-            utils.update_probabilities(robot_idx, simulation_step)
                 
             # Mutate remaining individuals
             mutate_population(r, n_robot_population)
@@ -823,10 +824,11 @@ if __name__ == "__main__":
             
             # Track values for analyzing and plotting
             utils.track_values(0)
+            utils.track_probs_values(0)
             
             # Draw final robot. 
             Draw(r, max_steps, 0)
             
             # Create video
-            experiment_name = "X_7"
+            experiment_name = "TEST"
             utils.create_video(experiment_name, "fit")
