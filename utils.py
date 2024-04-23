@@ -378,7 +378,7 @@ def generate_obj_positions(n_objects):
     for _ in range(n_objects):
         
         # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0.05, 0.3)
+        obj_x_pos = random.uniform(0.05, 0.2)
         obj_y_pos = random.uniform(ground_height+0.025, 0.35)
         
         # Check there is no object in same x and y.

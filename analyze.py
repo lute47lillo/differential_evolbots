@@ -10,6 +10,7 @@
 """
 import matplotlib.pyplot as plt
 import math
+import utils
 import numpy as np
 
 # def plot_loss(lists, xmax, xmin):
@@ -115,7 +116,7 @@ def plot_loss_2(lists, xmin, xmax):
     # Add labels and show plot
     fig.suptitle('All loss trajectories', fontsize=24)
     plt.tight_layout()
-    plt.savefig(f"plots/EXP_0_loss_15r_10o.png")
+    plt.savefig(f"plots/Loss_EXP_{name_experiment}_{n_pop}r_{n_opt}o.png")
     
     
 def plot_base_vs_fit(fit, base, xmax, xmin):
@@ -141,7 +142,7 @@ def plot_base_vs_fit(fit, base, xmax, xmin):
     plt.ylabel('Loss')
     plt.legend()
     plt.title('Comparison fitness')
-    plt.savefig(f"plots/0comparison.png")
+    plt.savefig(f"plots/Comp_EXP_{name_experiment}_{n_pop}r_{n_opt}o.png")
     
 def plot_probs():
     
@@ -171,7 +172,7 @@ def plot_probs():
         # Transpose the data to group values by index
         line_data = np.array(line_data).T
         for j, index_data in enumerate(line_data):
-            axs[row, col].plot(index_data*100, label=f'{mutation_action[j]}')
+            axs[row, col].scatter(range(len(index_data)), index_data*100, label=f'{mutation_action[j]}')
         axs[row, col].legend()
         axs[row, col].set_ylabel(f'Percentage (%) probability')
         axs[row, col].set_xlabel('Simulation Step')
@@ -184,11 +185,12 @@ def plot_probs():
             axs[row, col].axis('off')
 
     plt.tight_layout()
-    plt.savefig("plots/probs_test.png")
+    plt.savefig(f"plots/Probs_EXP_{name_experiment}_{n_pop}r_{n_opt}o.png")
 
 
 lists, xmax, xmin, fittest_values, base_values = read_statistics_file()
 # plot_loss(lists, xmax)
-# plot_base_vs_fit(fittest_values, base_values, xmax, xmin)
-# plot_loss_2(lists, xmin, xmax)
+n_pop, n_opt, name_experiment = utils.parse_args_baseline()
+plot_base_vs_fit(fittest_values, base_values, xmax, xmin)
+plot_loss_2(lists, xmin, xmax)
 plot_probs()

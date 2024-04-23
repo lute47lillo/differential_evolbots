@@ -24,12 +24,12 @@ gravity = -9.89
 learning_rate = 1
 piston_force = 0.07 # Force applied to the actuations. Bigger, piston force, less acrobatic
 x_offset = 0.1 # How far from left screen robot starts
-damping = 0.65 # Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.7 # 0.65 seens good. Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
-n_robot_population = 5
-n_optimization_steps = 2
-initial_robot_population = n_robot_population
+# n_robot_population = 5
+# n_optimization_steps = 2
+# initial_robot_population = n_robot_population
 
 """
     UTIL FUNCTIONS

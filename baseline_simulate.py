@@ -8,7 +8,6 @@ from robot import Robot
 # Initialize taichi
 tai.init()
 
-
 # TODO: Move global variables to an independent file
 max_steps = 200
 ground_height = 0.1
@@ -66,8 +65,9 @@ def compute_loss_baseline():
 """
 if __name__ == "__main__":
     
-    # TODO I do not think this is what you want to do
+    # Delete images from older run
     os.system("rm -rf img_base/*")
+    os.system("rm stats/baseline_loss.txt")
 
     # Parse arguments
     n_pop, n_opt, name_experiment = utils.parse_args_baseline()
@@ -86,9 +86,9 @@ if __name__ == "__main__":
     loss_tracker = []
 
     # Define optimization steps based on original simulation
-    baseline_opt_steps = (n_pop - 1) * n_opt
-
-    for opt_step in range(baseline_opt_steps):        
+    baseline_opt_steps = (n_pop - 1) * n_opt // 2
+    
+    for opt_step in range(n_opt):        
             
         if opt_step == 0:
             sim.Initialize_Neural_Network(r)
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             
         print(f"Robot {0} - Opt Step {opt_step}. Loss: {r.loss[None]}")
         
-        # Fine-tune the brain of the robot. # TODO: save the weights if better loss (?)
+        # Fine-tune the brain of the robot.
         _, _, _, _ = sim.tune_robots_brain(r)
         
         # Draw first. Initial drawing will be fittest morphology from main simulation.
@@ -122,7 +122,8 @@ if __name__ == "__main__":
             os.system(f"rm img_base/robot_0/*.png")
             draw_fittest_robot(r, 0, 0)
         
-        if opt_step % 10 == 0:
+        # TODO: Wathc out for modifications
+        if opt_step % n_opt == 0:
     
             # Save the loss
             loss_tracker.append(r.loss[None])
