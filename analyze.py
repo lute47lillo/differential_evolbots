@@ -10,6 +10,7 @@
 """
 import matplotlib.pyplot as plt
 import math
+import numpy as np
 
 # def plot_loss(lists, xmax, xmin):
     
@@ -114,7 +115,7 @@ def plot_loss_2(lists, xmin, xmax):
     # Add labels and show plot
     fig.suptitle('All loss trajectories', fontsize=24)
     plt.tight_layout()
-    plt.savefig(f"plots/exp5_loss_10r_10o.png")
+    plt.savefig(f"plots/EXP_0_loss_15r_10o.png")
     
     
 def plot_base_vs_fit(fit, base, xmax, xmin):
@@ -140,10 +141,54 @@ def plot_base_vs_fit(fit, base, xmax, xmin):
     plt.ylabel('Loss')
     plt.legend()
     plt.title('Comparison fitness')
-    plt.savefig(f"plots/comparison.png")
+    plt.savefig(f"plots/0comparison.png")
+    
+def plot_probs():
+    
+    # Read the file and extract the data
+    data = []
+    with open('stats/probs.txt', 'r') as file:
+        for line in file:
+            # Remove leading/trailing whitespace and square brackets
+            line = line.strip()[2:-2]
+            # Split the line into sublists
+            sublists = line.split("], [")
+            # Split each sublist into values and strip single quotes
+            values = [sublist.strip(" '").split("', '") for sublist in sublists]
+            # Convert values to floats
+            values = [[float(val) for val in sublist] for sublist in values]
+            data.append(values)
+
+    # Plot each line as its own subplot
+    num_values = len(data) + 1
+    grid_size = math.ceil(math.sqrt(num_values)) + 1
+    fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16,12))
+
+    mutation_action = ['add', 'remove', 'nothing']
+    for idx, line_data in enumerate(data):
+        row = idx // grid_size
+        col = idx % grid_size
+        # Transpose the data to group values by index
+        line_data = np.array(line_data).T
+        for j, index_data in enumerate(line_data):
+            axs[row, col].plot(index_data*100, label=f'{mutation_action[j]}')
+        axs[row, col].legend()
+        axs[row, col].set_ylabel(f'Percentage (%) probability')
+        axs[row, col].set_xlabel('Simulation Step')
+        
+     # Hide non-used arrays 
+    for i in range(num_values-1, grid_size**2 -1):
+        row = i // grid_size
+        col = i % grid_size
+        if row < axs.shape[0] and col < axs.shape[1]:
+            axs[row, col].axis('off')
+
+    plt.tight_layout()
+    plt.savefig("plots/probs_test.png")
 
 
 lists, xmax, xmin, fittest_values, base_values = read_statistics_file()
 # plot_loss(lists, xmax)
-plot_base_vs_fit(fittest_values, base_values, xmax, xmin)
+# plot_base_vs_fit(fittest_values, base_values, xmax, xmin)
 # plot_loss_2(lists, xmin, xmax)
+plot_probs()

@@ -725,7 +725,9 @@ def set_fittest_robot_draw(robot_index):
 if __name__ == "__main__":
     # Clean files for simulation
     utils.remove_files_before_simulation()
-
+    n_robot_population, n_optimization_steps, name_experiment = utils.parse_args_simulation()
+    initial_robot_population = n_robot_population
+    
     # Create population of robots
     springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
@@ -830,5 +832,4 @@ if __name__ == "__main__":
             Draw(r, max_steps, 0)
             
             # Create video
-            experiment_name = "TEST"
-            utils.create_video(experiment_name, "fit")
+            utils.create_video(f"X_{initial_robot_population}r_{n_optimization_steps}o_{name_experiment}", "fit")

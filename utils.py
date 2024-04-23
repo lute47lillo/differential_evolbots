@@ -537,7 +537,7 @@ def parse_args_simulation():
     parser.add_argument("--n_pop", type=int, help="Number of robots in the initial population.", required=True)
     parser.add_argument("--n_opt", type=int, help="Number of optimization steps for controller", required=True)
     parser.add_argument("--name", type=str, help="Name of the simulation run", required=True)
-    parser.add_argument("--lr", type=float, help="Learning Rate", required=True)
+    # parser.add_argument("--lr", type=float, help="Learning Rate", required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -546,7 +546,7 @@ def parse_args_simulation():
     n_pop = args.n_pop
     n_opt = args.n_opt
     name_experiment = args.name
-    learning_rate = args.lr
+    # learning_rate = args.lr
     
-    return n_pop, n_opt, name_experiment, learning_rate
+    return n_pop, n_opt, name_experiment
 
