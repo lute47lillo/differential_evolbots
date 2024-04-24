@@ -31,6 +31,7 @@ n_sin_waves = 10
 # n_optimization_steps = 2
 # initial_robot_population = n_robot_population
 
+# TODO: SAVE 4_12r_5o
 """
     UTIL FUNCTIONS
 """
@@ -734,7 +735,6 @@ if __name__ == "__main__":
     for simulation_step in range(initial_robot_population):
         
         print(f"\nSIMULATION RUN {simulation_step+1}")
-        robot_drawing = []
         
         for robot_idx in range(n_robot_population):
             print(f"\nWorking on robot {robot_idx}")
@@ -792,7 +792,7 @@ if __name__ == "__main__":
                 
                 # Save optimized steps Across simulation runs.
                 save_controller_weights(r, robot_idx, simulation_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
-             
+    
         # Set new number of individuals in population
         n_robot_population -= 1
             
@@ -802,7 +802,7 @@ if __name__ == "__main__":
             utils.update_probabilities(robot_idx, simulation_step)
             
             # Eliminate the lowest-ranked individual by fitness
-            idx_robot_delete = eliminate_individual(n_robot_population)
+            idx_robot_delete = eliminate_individual(n_robot_population+1)
             
             # Re-order file indices for simplicity
             utils.update_files()
@@ -829,7 +829,9 @@ if __name__ == "__main__":
             utils.track_probs_values(0)
             
             # Draw final robot. 
+            # TODO: Still not idea since it has to re-simulate one last time. Ideally it jumps from deleteing to drawing the final one.
+            # TODO: It will be load controllers, simulate, save loss and draw.
             Draw(r, max_steps, 0)
             
             # Create video
-            utils.create_video(f"X_{initial_robot_population}r_{n_optimization_steps}o_{name_experiment}", "fit")
+            utils.create_video(f"X_{name_experiment}_{initial_robot_population}r_{n_optimization_steps}o", "fit")

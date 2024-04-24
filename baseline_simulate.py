@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # Define optimization steps based on original simulation
     baseline_opt_steps = (n_pop - 1) * n_opt // 2
     
-    for opt_step in range(n_opt):        
+    for opt_step in range(n_pop):        
             
         if opt_step == 0:
             sim.Initialize_Neural_Network(r)
@@ -123,10 +123,10 @@ if __name__ == "__main__":
             draw_fittest_robot(r, 0, 0)
         
         # TODO: Wathc out for modifications
-        if opt_step % n_opt == 0:
+        #if opt_step % n_opt == 0:
     
-            # Save the loss
-            loss_tracker.append(r.loss[None])
+        # Save the loss
+        loss_tracker.append(r.loss[None])
         
         if opt_step == (baseline_opt_steps - 1):
             loss_tracker.append(r.loss[None])

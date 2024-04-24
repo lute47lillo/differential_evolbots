@@ -1,5 +1,6 @@
 import taichi as tai
 
+@tai.data_oriented
 class Robot:
     
     def __init__(self, springs, startingObjectPositions, max_steps):
