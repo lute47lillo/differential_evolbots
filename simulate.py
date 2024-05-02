@@ -18,18 +18,15 @@ import time
 """
 max_steps = 200
 ground_height = 0.1
-stiffness = 1000 # Strength of the spring in the example
+stiffness = 1050 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.89
 learning_rate = 1
-piston_force = 0.07 # Force applied to the actuations. Bigger, piston force, less acrobatic
+piston_force = 0.070 # Force applied to the actuations. Bigger, piston force, less acrobatic. Higher -> more stable
 x_offset = 0.1 # How far from left screen robot starts
-damping = 0.7 # 0.65 seens good. Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.65 # 0.65 seens good. Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
-# n_robot_population = 5
-# n_optimization_steps = 2
-# initial_robot_population = n_robot_population
 
 # TODO: SAVE 4_12r_5o
 """
@@ -38,7 +35,7 @@ n_sin_waves = 10
 
 # -----------------------------------------------------------------
 
-def simulate_robot(robot_index):
+def simulate_robot(robot_index, sim_type):
     """
         Definition
         -----------
@@ -75,16 +72,17 @@ def simulate_robot(robot_index):
             utils.create_spring(springs_robot, i, j, is_motor, startingObjectPositions)
  
     # Write information of the robot morphology to text
-    with open(f"population/robot_{robot_index}.txt", 'w') as file:
-        
-        # Write Object position
-        pos_line = str(startingObjectPositions) + '\n'
-        file.write(pos_line)
-        
-        # Write springs information
-        for sublist in springs_robot:
-            line = ' '.join(map(str, sublist)) + '\n'
-            file.write(line)
+    if sim_type == "co-ev":
+        with open(f"population/robot_{robot_index}.txt", 'w') as file:
+            
+            # Write Object position
+            pos_line = str(startingObjectPositions) + '\n'
+            file.write(pos_line)
+            
+            # Write springs information
+            for sublist in springs_robot:
+                line = ' '.join(map(str, sublist)) + '\n'
+                file.write(line)
 
     return springs_robot, startingObjectPositions
 
@@ -110,7 +108,7 @@ def create_population(n_robots_population):
     
     # Simulate individual robot and gather springs
     for idx_robot in range(n_robots_population):
-        springs, startingObjectPositions = simulate_robot(idx_robot)
+        springs, startingObjectPositions = simulate_robot(idx_robot, "co-ev")
         springs_population.append(springs)   
         startingObjectPositions_population.append(startingObjectPositions) 
     
@@ -732,6 +730,7 @@ if __name__ == "__main__":
     # Create population of robots
     springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
+    # TODO: initial_robot_population - 1
     for simulation_step in range(initial_robot_population):
         
         print(f"\nSIMULATION RUN {simulation_step+1}")
@@ -796,11 +795,14 @@ if __name__ == "__main__":
         # Set new number of individuals in population
         n_robot_population -= 1
             
+        # TODO: n_robot_population != 1
         if n_robot_population != 0:
             
             # Update Action probabilities
             utils.update_probabilities(robot_idx, simulation_step)
             
+            # When it is != 1 but is 2, Then save last both attributes to be able to replicate
+            # TODO: Problem comes when last eliminated is 1, but is still 1 in memory from last optimization.
             # Eliminate the lowest-ranked individual by fitness
             idx_robot_delete = eliminate_individual(n_robot_population+1)
             

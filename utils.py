@@ -203,10 +203,10 @@ def track_probs_values(robot_idx):
         file.writelines(save_line)
         file.close()
 
-def baseline_stat_loss_save(loss_baseline):
+def baseline_stat_loss_save(loss_baseline, type_variant):
             
     # Save the losses for the robot and its intial index.
-    with open(f"stats/baseline_loss.txt", 'a+') as file:
+    with open(f"stats/baseline_loss_{type_variant}.txt", 'a+') as file:
         save_line = str(loss_baseline) + "\n"
         file.writelines(save_line)
         file.close()
@@ -517,6 +517,7 @@ def parse_args_baseline():
     parser.add_argument("--n_pop", type=int, help="Number of robots in the initial population.", required=True)
     parser.add_argument("--n_opt", type=int, help="Number of optimization steps for controller", required=True)
     parser.add_argument("--name", type=str, help="Name of the simulation run", required=True)
+    parser.add_argument("--type_v", type=str, help="Random variant (random) or Testing Co-Ev (test)", required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -525,8 +526,9 @@ def parse_args_baseline():
     n_pop = args.n_pop
     n_opt = args.n_opt
     name_experiment = args.name
+    type_variant = args.type_v
     
-    return n_pop, n_opt, name_experiment
+    return n_pop, n_opt, name_experiment, type_variant
 
 def parse_args_simulation():
     
