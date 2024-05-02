@@ -38,8 +38,10 @@ def create_video(experiment_name, type_exp):
     
     if type_exp == "fit":
         os.system(f" ffmpeg -i images/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
+    elif type_exp == "test":
+        os.system(f" ffmpeg -i img_test/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
     else:
-        os.system(f" ffmpeg -i img_base/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
+        os.system(f" ffmpeg -i img_random/robot_0/image_%d.png recordings/{experiment_name}_sim.mp4")
 
 # -----------------------------------------------------------------
 

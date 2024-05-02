@@ -79,10 +79,12 @@ if __name__ == "__main__":
         # A/B Testing
         springs, startingObjectPositions = sim.simulate_robot(0, variant_type)
         image_dir = 'img_random'
+        type_video = 'random'
     else:
         # Read springs and objects
         springs, startingObjectPositions = utils.read_objects_springs_fit_robot(0)
         image_dir = 'img_test'
+        type_video = 'test'
 
     # Create Robot
     r = Robot(springs, startingObjectPositions, max_steps)
@@ -145,4 +147,4 @@ if __name__ == "__main__":
 
     # Draw and crate video of the baseline - fittest robot
     draw_fittest_robot(r, image_dir, 200, 0)
-    utils.create_video(f"{variant_type}_{name_experiment}_{n_pop}r_{n_opt}o", "re")
+    utils.create_video(f"{variant_type}_{name_experiment}_{n_pop}r_{n_opt}o", type_video)
