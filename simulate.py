@@ -722,6 +722,9 @@ def set_fittest_robot_draw(robot_index):
 # -------------------------------------------------------------
 
 if __name__ == "__main__":
+    
+    tai.init(arch=tai.gpu) 
+    
     # Clean files for simulation
     utils.remove_files_before_simulation()
     n_robot_population, n_optimization_steps, name_experiment = utils.parse_args_simulation()
