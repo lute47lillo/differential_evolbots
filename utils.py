@@ -129,6 +129,7 @@ def remove_files_before_simulation():
     os.system("rm trackers_loss/*.txt")
     os.system("rm controller/*.npz")
     os.system(f"rm stats/loss.txt")
+    os.system(f"rm stats/probs.txt")
     os.system("rm -rf images/*")
 
 # -----------------------------------------------------------------
@@ -154,7 +155,6 @@ def track_values(robot_idx):
         Definition
         -----------
             Tracks loss values of all robots to later be used to plot.
-            TODO: Include mutation action probabilities.
         
         Parameters
         -----------
@@ -176,11 +176,37 @@ def track_values(robot_idx):
         save_line = str(losses) + "\n"
         file.writelines(save_line)
         file.close()
+        
+def track_probs_values(robot_idx):
+    """
+        Definition
+        -----------
+            Tracks probabilities to take mutation actions of all robots to later be used to plot.
+        
+        Parameters
+        -----------
+            - robot_idx (int): Number that represents the current robot on which the calculation is being made.
+            
+        Returns
+        -----------
+            None
+    """
+    
+    # Read losses over time independently  
+    with open(f"trackers_prob/prob_{robot_idx}.txt", 'r') as file:
+        lines = file.readlines()
+        probs = [line.split() for line in lines]
+        file.close()
+        
+    with open(f"stats/probs.txt", "a+") as file:
+        save_line = str(probs) + "\n"
+        file.writelines(save_line)
+        file.close()
 
-def baseline_stat_loss_save(loss_baseline):
+def baseline_stat_loss_save(loss_baseline, type_variant):
             
     # Save the losses for the robot and its intial index.
-    with open(f"stats/baseline_loss.txt", 'a+') as file:
+    with open(f"stats/baseline_loss_{type_variant}.txt", 'a+') as file:
         save_line = str(loss_baseline) + "\n"
         file.writelines(save_line)
         file.close()
@@ -236,7 +262,7 @@ def update_probabilities(n_robot_population, simulation_step):
             - nothing_prob (float): Probability of selecting the 'Do nothing' mutation action. 
     """
     
-    for robot_idx in range(n_robot_population):
+    for robot_idx in range(n_robot_population+1):
         
         # Read from file existing objects
         if simulation_step > 0:
@@ -290,7 +316,7 @@ def update_probabilities(n_robot_population, simulation_step):
             save_actions = str(add_prob) + " " + str(remove_prob) + " " + str(nothing_prob) + "\n"
             file.write(save_actions)
             file.close()
-            
+        
     return add_prob, remove_prob, nothing_prob
 
 def get_probabilities(robot_idx):
@@ -352,7 +378,7 @@ def generate_obj_positions(n_objects):
     for _ in range(n_objects):
         
         # Generate random x_pos and y_pos
-        obj_x_pos = random.uniform(0.05, 0.3)
+        obj_x_pos = random.uniform(0.05, 0.2)
         obj_y_pos = random.uniform(ground_height+0.025, 0.35)
         
         # Check there is no object in same x and y.
@@ -491,6 +517,7 @@ def parse_args_baseline():
     parser.add_argument("--n_pop", type=int, help="Number of robots in the initial population.", required=True)
     parser.add_argument("--n_opt", type=int, help="Number of optimization steps for controller", required=True)
     parser.add_argument("--name", type=str, help="Name of the simulation run", required=True)
+    parser.add_argument("--type_v", type=str, help="Random variant (random) or Testing Co-Ev (test)", required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -499,8 +526,9 @@ def parse_args_baseline():
     n_pop = args.n_pop
     n_opt = args.n_opt
     name_experiment = args.name
+    type_variant = args.type_v
     
-    return n_pop, n_opt, name_experiment
+    return n_pop, n_opt, name_experiment, type_variant
 
 def parse_args_simulation():
     
@@ -511,7 +539,7 @@ def parse_args_simulation():
     parser.add_argument("--n_pop", type=int, help="Number of robots in the initial population.", required=True)
     parser.add_argument("--n_opt", type=int, help="Number of optimization steps for controller", required=True)
     parser.add_argument("--name", type=str, help="Name of the simulation run", required=True)
-    parser.add_argument("--lr", type=float, help="Learning Rate", required=True)
+    # parser.add_argument("--lr", type=float, help="Learning Rate", required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -520,7 +548,7 @@ def parse_args_simulation():
     n_pop = args.n_pop
     n_opt = args.n_opt
     name_experiment = args.name
-    learning_rate = args.lr
+    # learning_rate = args.lr
     
-    return n_pop, n_opt, name_experiment, learning_rate
+    return n_pop, n_opt, name_experiment
 

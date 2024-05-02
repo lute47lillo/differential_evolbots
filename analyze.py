@@ -10,6 +10,8 @@
 """
 import matplotlib.pyplot as plt
 import math
+import utils
+import numpy as np
 
 def read_statistics_file():
     with open(f"stats/loss.txt", 'r') as file:
@@ -30,36 +32,26 @@ def read_statistics_file():
     xmax = max(max(lst) for lst in lists)
     xmin = min(min(lst) for lst in lists)
     
-    return lists, xmax, xmin
-
-def plot_loss(lists, xmax, xmin):
+    fittest_values = lists[-1]
     
-    # Plot each list as a line
-    for lst in lists:
-        plt.scatter(range(len(lst)), lst)
-
-    # Set x-axis limit to the length of the longest list
-    plt.xlim(-1, xmax)
-    plt.ylim(-0.3, -0.10)
-
-    plt.yticks([-0.3, -0.28, -0.26, -0.24, -0.22, -0.20, -0.18, -0.16, -0.14, -0.12])
-    plt.xticks([0, 5, 10, 15, 20])
-    # Add labels and show plot
-    plt.xlabel('Simulation Step')
-    plt.ylabel('Loss')
-    plt.title('Values from File')
-    plt.savefig(f"plots/loss.png")
-    # plt.show()
+    with open(f"stats/baseline_loss_random.txt", 'r') as file:
+        line = file.readline().rstrip('\n')
+        random_values = [float(num) for num in line.strip('[]').split(',')]
+        file.close()
+        
+    with open(f"stats/baseline_loss_test.txt", 'r') as file:
+        line = file.readline().rstrip('\n')
+        test_values = [float(num) for num in line.strip('[]').split(',')]
+        file.close()
+    
+    return lists, xmax, xmin, fittest_values, random_values, test_values
     
 def plot_loss_2(lists, xmin, xmax):
-    # Create a 5x4 grid of subplots
-    # TODO: Create grid of plots based on how many are in the list
-    # fig, axs = plt.subplots(5, 6, figsize=(40, 20))
+    # Create grid of plots based on how many are in the list
     num_values = len(lists) + 1
-    grid_size = math.ceil(math.sqrt(num_values)) + 1
+    grid_size = math.ceil(math.sqrt(num_values)) 
     print(grid_size)
     fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16, 12))
-
 
     x_ticks = []
     for i in range(0, len(lists)):
@@ -106,10 +98,82 @@ def plot_loss_2(lists, xmin, xmax):
     # Add labels and show plot
     fig.suptitle('All loss trajectories', fontsize=24)
     plt.tight_layout()
-    plt.savefig(f"plots/exp5_loss_10r_10o.png")
+    plt.savefig(f"plots/loss/Loss_{name_experiment}_{n_pop}r_{n_opt}o.png")
     
-lists, xmax, xmin= read_statistics_file()
+    
+def plot_random_vs_fit_vs_test(fit, random, test, xmax, xmin):
+    
+    x_ticks = []
+    for i in range(0, len(lists)):
+        x_ticks.append(i) 
+   
+    y_ticks = []
+    current = xmin
+    while current <= xmax:
+        diff = xmax - xmin
+        ticks_step = round(float(diff / 10), 2)
+        y_ticks.append(round(current, 2))  # Round to 2 decimal places
+        current += ticks_step
+        
+    # Plot each list as a line
+    plt.plot(range(len(fit)), fit, label="Co-Evolution")
+    plt.plot(range(len(random)), random, label="Random")
+    plt.plot(range(len(test)), test, label="Test Co-Ev Controller")
+
+    # Add labels and show plot
+    plt.xlabel('Simulation Step')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.title('Comparison fitness')
+    plt.savefig(f"plots/comparisons/Comp_EXP_{name_experiment}_{n_pop}r_{n_opt}o.png")
+    
+def plot_probs():
+    
+    # Read the file and extract the data
+    data = []
+    with open('stats/probs.txt', 'r') as file:
+        for line in file:
+            # Remove leading/trailing whitespace and square brackets
+            line = line.strip()[2:-2]
+            # Split the line into sublists
+            sublists = line.split("], [")
+            # Split each sublist into values and strip single quotes
+            values = [sublist.strip(" '").split("', '") for sublist in sublists]
+            # Convert values to floats
+            values = [[float(val) for val in sublist] for sublist in values]
+            data.append(values)
+
+    # Plot each line as its own subplot
+    num_values = len(data) + 1
+    grid_size = math.ceil(math.sqrt(num_values))
+    fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16,12))
+
+    mutation_action = ['add', 'remove', 'nothing']
+    for idx, line_data in enumerate(data):
+        row = idx // grid_size
+        col = idx % grid_size
+        # Transpose the data to group values by index
+        line_data = np.array(line_data).T
+        for j, index_data in enumerate(line_data):
+            axs[row, col].scatter(range(len(index_data)), index_data*100, label=f'{mutation_action[j]}')
+        axs[row, col].legend()
+        axs[row, col].set_ylabel(f'Percentage (%) probability')
+        axs[row, col].set_xlabel('Simulation Step')
+        
+     # Hide non-used arrays 
+    for i in range(num_values-1, grid_size**2 -1):
+        row = i // grid_size
+        col = i % grid_size
+        if row < axs.shape[0] and col < axs.shape[1]:
+            axs[row, col].axis('off')
+
+    plt.tight_layout()
+    plt.savefig(f"plots/mutations/Probs_{name_experiment}_{n_pop}r_{n_opt}o.png")
 
 
-# plot_loss(lists, xmax)
+lists, xmax, xmin, fittest_values, random_values, test_values = read_statistics_file()
+n_pop, n_opt, name_experiment, type_variant = utils.parse_args_baseline()
+
+plot_random_vs_fit_vs_test(fittest_values, random_values, test_values, xmax, xmin)
 plot_loss_2(lists, xmin, xmax)
+plot_probs()

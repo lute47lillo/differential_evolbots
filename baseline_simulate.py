@@ -7,13 +7,13 @@ from robot import Robot
 
 # Initialize taichi
 tai.init()
-
+print(tai.__version__)
 
 # TODO: Move global variables to an independent file
 max_steps = 200
 ground_height = 0.1
 
-def draw_fittest_robot(r, frame_offset, robot_index):
+def draw_fittest_robot(r, img_dir, frame_offset, robot_index):
         
     for time_step in range(0, r.max_steps):
         # Draw the robot using Taichi's built-iGUI. (x,y) size of window
@@ -47,10 +47,10 @@ def draw_fittest_robot(r, frame_offset, robot_index):
             else:
                 tai_gui.line(begin=position_a, end=position_b, color=0x0, radius=1)
 
-        if not os.path.exists(f"img_base/robot_{robot_index}"):
-            os.makedirs(f"img_base/robot_{robot_index}")  
+        if not os.path.exists(f"{img_dir}/robot_{robot_index}"):
+            os.makedirs(f"{img_dir}/robot_{robot_index}")  
                
-        tai_gui.show(f"img_base/robot_{robot_index}/image_{frame_offset+time_step}.png")
+        tai_gui.show(f"{img_dir}/robot_{robot_index}/image_{frame_offset+time_step}.png")
 
 @tai.kernel
 def compute_loss_baseline():
@@ -66,14 +66,23 @@ def compute_loss_baseline():
 """
 if __name__ == "__main__":
     
-    # TODO I do not think this is what you want to do
-    os.system("rm -rf img_base/*")
-
     # Parse arguments
-    n_pop, n_opt, name_experiment = utils.parse_args_baseline()
+    n_pop, n_opt, name_experiment, variant_type = utils.parse_args_baseline()
     
-    # Read springs and objects
-    springs, startingObjectPositions = utils.read_objects_springs_fit_robot(0)
+    # Delete images from older run
+    os.system("rm -rf img_random/*")
+    os.system("rm -rf img_test/*")
+    os.system(f"rm stats/baseline_loss_{variant_type}.txt")
+    
+    # Baseline simulation for test co-evolution or random Variant B for A/B testing.
+    if variant_type == "random":
+        # A/B Testing
+        springs, startingObjectPositions = sim.simulate_robot(0, variant_type)
+        image_dir = 'img_random'
+    else:
+        # Read springs and objects
+        springs, startingObjectPositions = utils.read_objects_springs_fit_robot(0)
+        image_dir = 'img_test'
 
     # Create Robot
     r = Robot(springs, startingObjectPositions, max_steps)
@@ -86,9 +95,9 @@ if __name__ == "__main__":
     loss_tracker = []
 
     # Define optimization steps based on original simulation
-    baseline_opt_steps = (n_pop - 1) * n_opt
-
-    for opt_step in range(baseline_opt_steps):        
+    baseline_opt_steps = (n_pop - 1) * n_opt // 2
+    
+    for opt_step in range(n_pop):        
             
         if opt_step == 0:
             sim.Initialize_Neural_Network(r)
@@ -114,22 +123,26 @@ if __name__ == "__main__":
             
         print(f"Robot {0} - Opt Step {opt_step}. Loss: {r.loss[None]}")
         
-        # Fine-tune the brain of the robot. # TODO: save the weights if better loss (?)
+        # Fine-tune the brain of the robot.
         _, _, _, _ = sim.tune_robots_brain(r)
         
         # Draw first. Initial drawing will be fittest morphology from main simulation.
         if opt_step == 0:
-            os.system(f"rm img_base/robot_0/*.png")
-            draw_fittest_robot(r, 0, 0)
+            os.system(f"rm {image_dir}/robot_0/*.png")
+            draw_fittest_robot(r, image_dir, 0, 0)
         
-        if opt_step % 10 == 0:
+        # TODO: Wathc out for modifications
+        #if opt_step % n_opt == 0:
     
-            # Save the loss
+        # Save the loss
+        loss_tracker.append(r.loss[None])
+        
+        if opt_step == (baseline_opt_steps - 1):
             loss_tracker.append(r.loss[None])
             
     # Save the loss tracker to analyze and plot.    
-    utils.baseline_stat_loss_save(loss_tracker)
+    utils.baseline_stat_loss_save(loss_tracker, variant_type)
 
     # Draw and crate video of the baseline - fittest robot
-    draw_fittest_robot(r, 200, 0)
-    utils.create_video(f"RE_{name_experiment}_{n_pop}r_{n_opt}o", "re")
+    draw_fittest_robot(r, image_dir, 200, 0)
+    utils.create_video(f"{variant_type}_{name_experiment}_{n_pop}r_{n_opt}o", "re")
