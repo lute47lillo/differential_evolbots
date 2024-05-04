@@ -18,15 +18,21 @@ import time
 """
 max_steps = 200
 ground_height = 0.1
-stiffness = 1050 # Strength of the spring in the example
+stiffness = 1000 # Strength of the spring in the example
 dt = 0.01 # Amount of time that elapses between time steps.
 gravity = -9.89
 learning_rate = 1
-piston_force = 0.070 # Force applied to the actuations. Bigger, piston force, less acrobatic. Higher -> more stable
+piston_force = 0.065 # Force applied to the actuations. Bigger, piston force, less acrobatic. Higher -> more stable
 x_offset = 0.1 # How far from left screen robot starts
-damping = 0.65 # 0.65 seens good. Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
+damping = 0.615 # 0.65 seens good. Is a constant that controls how much you slow the velocity of the object to which is applied. (1-damping) = X% reductions each time-step
 n_hidden_neurons = 32
 n_sin_waves = 10
+
+# 5 opt steps
+# piston_force = 0.07, damping = 0.65
+
+# 10 opt steps. Should check more
+# piston_force = 0.065, damping = 0.60 
 
 # TODO: SAVE 4_12r_5o
 """
@@ -124,10 +130,8 @@ def Compute_loss():
     # Second component of zeroth object. Loss = Height of 0th objects at last time_step [1]
     
     # TODO: Try with negative final position
-    loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
-                + (1.2 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
-                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
-                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
+    loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0] - 0.1)             + (r.positions[r.max_steps-1, 1][0] - 0.3)) \
+                - (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0]) + (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
     
 # -------------------------------------------------------------
 
@@ -505,12 +509,16 @@ def load_controller_weights(r, robot_index):
     
 # -------------------------------------------------------------
 
-def eliminate_individual(n_robot_population):
+def eliminate_individual(n_robot_population, is_last_two):
     
     # Lowest fitness is in our case the highest positive value because we want to minimize it.
     temp_lowest = -1000000
     idx_robot_delete = 0
     
+    if n_robot_population == 3:
+        print("\nSetting is last two now!")
+        is_last_two = True
+        
     for robot_index in range(n_robot_population):
         with open(f"fitness/loss_{robot_index}.txt", 'r') as file:
             temp_loss = file.read()
@@ -535,7 +543,7 @@ def eliminate_individual(n_robot_population):
     os.system(f"rm controller/weights_{idx_robot_delete}.npz")
     shutil.rmtree(f"images/robot_{idx_robot_delete}/")
     
-    return idx_robot_delete
+    return idx_robot_delete, is_last_two
         
 # -------------------------------------------------------------
 
@@ -729,12 +737,13 @@ if __name__ == "__main__":
     utils.remove_files_before_simulation()
     n_robot_population, n_optimization_steps, name_experiment = utils.parse_args_simulation()
     initial_robot_population = n_robot_population
+    is_last_two = False
     
     # Create population of robots
     springs_population, startingObjectPositions_population = create_population(n_robot_population)  
 
     # TODO: initial_robot_population - 1
-    for simulation_step in range(initial_robot_population):
+    for simulation_step in range(initial_robot_population-1):
         
         print(f"\nSIMULATION RUN {simulation_step+1}")
         
@@ -795,48 +804,44 @@ if __name__ == "__main__":
                 # Save optimized steps Across simulation runs.
                 save_controller_weights(r, robot_idx, simulation_step, opt_step, prev_w_SH, prev_w_HM, prev_w_hidden, prev_w_bias_hidden)  
     
+                # Draw two last robots already. This solves the lost spring_anchors problems. 
+                if is_last_two and opt_step == n_optimization_steps - 1:
+                    print(f"Drawing final robot {robot_idx}")
+                    Draw(r, max_steps, robot_idx)
+            
+        # Update Action probabilities
+        utils.update_probabilities(robot_idx, simulation_step)
+            
+        # Eliminate the lowest-ranked individual by fitness and check if last two robots.
+        idx_robot_delete, is_last_two = eliminate_individual(n_robot_population, is_last_two)
+        
+        # Re-order file indices for simplicity
+        utils.update_files()
+        
+        # Delete from list of springs and objects
+        springs_population.pop(idx_robot_delete)
+        startingObjectPositions_population.pop(idx_robot_delete)
+        
         # Set new number of individuals in population
         n_robot_population -= 1
-            
-        # TODO: n_robot_population != 1
-        if n_robot_population != 0:
-            
-            # Update Action probabilities
-            utils.update_probabilities(robot_idx, simulation_step)
-            
-            # When it is != 1 but is 2, Then save last both attributes to be able to replicate
-            # TODO: Problem comes when last eliminated is 1, but is still 1 in memory from last optimization.
-            # Eliminate the lowest-ranked individual by fitness
-            idx_robot_delete = eliminate_individual(n_robot_population+1)
-            
-            # Re-order file indices for simplicity
-            utils.update_files()
-            
-            # Delete from list of springs and objects
-            springs_population.pop(idx_robot_delete)
-            startingObjectPositions_population.pop(idx_robot_delete)
-                
+        
+        print(f"\nCurrent robot population: {n_robot_population}")
+        
+        if n_robot_population != 1:
+                            
             # Mutate remaining individuals
             mutate_population(r, n_robot_population)
             
         else:
             print(f"\nEND SIMULATION")
-            
-            # Re-read the fittest robot objects and springs
-            # set_fittest_robot_draw(0)
             time.sleep(2)
             
             # Debug check
-            print(f"The final robot is:\n{springs_population[0]}\n{startingObjectPositions_population[0]}")
+            print(f"The final robot is Springs:\n{springs_population[0]}\nObjects:{startingObjectPositions_population[0]}")
             
             # Track values for analyzing and plotting
             utils.track_values(0)
             utils.track_probs_values(0)
-            
-            # Draw final robot. 
-            # TODO: Still not idea since it has to re-simulate one last time. Ideally it jumps from deleteing to drawing the final one.
-            # TODO: It will be load controllers, simulate, save loss and draw.
-            Draw(r, max_steps, 0)
             
             # Create video
             utils.create_video(f"X_{name_experiment}_{initial_robot_population}r_{n_optimization_steps}o", "fit")

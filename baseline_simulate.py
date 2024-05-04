@@ -55,10 +55,13 @@ def draw_fittest_robot(r, img_dir, frame_offset, robot_index):
 @tai.kernel
 def compute_loss_baseline():
     
-    loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
-                + (1.2 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
-                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
-                + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
+    # loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0]) - 0.1) \
+    #             + (1.2 * (r.positions[r.max_steps-1, 1][0]) - 0.3) \
+    #             + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0])) \
+    #             + (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 1][0])) 
+    
+    loss[None] -= (1.2 * (r.positions[r.max_steps-1, 0][0] - 0.1)             + (r.positions[r.max_steps-1, 1][0] - 0.3)) \
+                - (0.7 * (r.goal[None][0] - r.positions[r.max_steps-1, 0][0]) + (r.goal[None][0] - r.positions[r.max_steps-1, 1][0]))
 
 
 """
@@ -75,14 +78,17 @@ if __name__ == "__main__":
     os.system(f"rm stats/baseline_loss_{variant_type}.txt")
     
     # Baseline simulation for test co-evolution or random Variant B for A/B testing.
+    # random should'nt draw initial, just after evolving to alleviate time.
     if variant_type == "random":
         # A/B Testing
         springs, startingObjectPositions = sim.simulate_robot(0, variant_type)
         image_dir = 'img_random'
+        type_video = 'random'
     else:
         # Read springs and objects
         springs, startingObjectPositions = utils.read_objects_springs_fit_robot(0)
         image_dir = 'img_test'
+        type_video = 'test'
 
     # Create Robot
     r = Robot(springs, startingObjectPositions, max_steps)
@@ -97,7 +103,7 @@ if __name__ == "__main__":
     # Define optimization steps based on original simulation
     baseline_opt_steps = (n_pop - 1) * n_opt // 2
     
-    for opt_step in range(n_pop):        
+    for opt_step in range(n_pop-1):        
             
         if opt_step == 0:
             sim.Initialize_Neural_Network(r)
@@ -145,4 +151,4 @@ if __name__ == "__main__":
 
     # Draw and crate video of the baseline - fittest robot
     draw_fittest_robot(r, image_dir, 200, 0)
-    utils.create_video(f"{variant_type}_{name_experiment}_{n_pop}r_{n_opt}o", "re")
+    utils.create_video(f"{variant_type}_{name_experiment}_{n_pop}r_{n_opt}o", type_video)

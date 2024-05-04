@@ -47,10 +47,11 @@ def read_statistics_file():
     return lists, xmax, xmin, fittest_values, random_values, test_values
     
 def plot_loss_2(lists, xmin, xmax):
+    
     # Create grid of plots based on how many are in the list
     num_values = len(lists) + 1
-    grid_size = math.ceil(math.sqrt(num_values)) 
-    print(grid_size)
+    grid_size = math.ceil(math.sqrt(num_values)) + 1
+    # print(grid_size)
     fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16, 12))
 
     x_ticks = []
@@ -66,6 +67,7 @@ def plot_loss_2(lists, xmin, xmax):
         current += ticks_step
         
     # Plot each list in a subplot
+    # print(lists)
     for idx, lst in enumerate(lists):
         row = idx // grid_size
         col = idx % grid_size
@@ -119,6 +121,8 @@ def plot_random_vs_fit_vs_test(fit, random, test, xmax, xmin):
     plt.plot(range(len(fit)), fit, label="Co-Evolution")
     plt.plot(range(len(random)), random, label="Random")
     plt.plot(range(len(test)), test, label="Test Co-Ev Controller")
+    # plt.yticks(y_ticks)
+    plt.xticks(x_ticks)
 
     # Add labels and show plot
     plt.xlabel('Simulation Step')
@@ -145,7 +149,7 @@ def plot_probs():
 
     # Plot each line as its own subplot
     num_values = len(data) + 1
-    grid_size = math.ceil(math.sqrt(num_values))
+    grid_size = math.ceil(math.sqrt(num_values)) + 1
     fig, axs = plt.subplots(grid_size-1, grid_size, figsize=(16,12))
 
     mutation_action = ['add', 'remove', 'nothing']
@@ -172,7 +176,7 @@ def plot_probs():
 
 
 lists, xmax, xmin, fittest_values, random_values, test_values = read_statistics_file()
-n_pop, n_opt, name_experiment, type_variant = utils.parse_args_baseline()
+n_pop, n_opt, name_experiment, _ = utils.parse_args_baseline()
 
 plot_random_vs_fit_vs_test(fittest_values, random_values, test_values, xmax, xmin)
 plot_loss_2(lists, xmin, xmax)
